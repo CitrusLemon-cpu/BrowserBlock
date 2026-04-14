@@ -101,10 +101,10 @@ class SetupActivity : AppCompatActivity() {
             badge.text = getString(R.string.badge_granted)
             badge.background = ContextCompat.getDrawable(this, R.drawable.bg_badge_granted)
             button.isEnabled = false
-            button.text = "✓"
+            button.text = getString(R.string.badge_granted_check)
         } else {
             button.isEnabled = true
-            button.text = "Enable"
+            button.text = getString(R.string.button_enable)
             when (tier) {
                 PermissionTier.REQUIRED -> {
                     badge.text = getString(R.string.badge_required)

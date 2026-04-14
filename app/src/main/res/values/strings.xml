@@ -26,6 +26,7 @@
     <string name="badge_required">Required</string>
     <string name="badge_recommended">Recommended</string>
     <string name="badge_optional">Optional</string>
+    <string name="badge_granted_check">✓</string>
 
     <!-- Permission labels (shown in the setup checklist) -->
     <string name="permission_usage_stats_label">Usage access</string>
@@ -70,6 +71,7 @@
     <!-- General UI -->
     <string name="button_continue">Continue</string>
     <string name="button_grant">Grant</string>
+    <string name="button_enable">Enable</string>
     <string name="button_skip">Skip</string>
     <string name="button_done">Done</string>
     <string name="button_open_settings">Open settings</string>
