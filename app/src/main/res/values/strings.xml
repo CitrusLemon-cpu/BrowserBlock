@@ -3,7 +3,30 @@
 
     <!-- SetupActivity -->
     <string name="setup_title">Set up BrowserBlock</string>
-    <string name="setup_subtitle">Grant the required permissions to get started.</string>
+    <string name="setup_subtitle">Grant permissions to start blocking</string>
+
+    <!-- SetupActivity — permission card titles -->
+    <string name="perm_title_accessibility">Core blocking engine</string>
+    <string name="perm_title_overlay">Show block screen</string>
+    <string name="perm_title_usage_stats">Fallback detection</string>
+    <string name="perm_title_notif_listener">Suppress notifications</string>
+    <string name="perm_title_device_admin">Prevent uninstall</string>
+    <string name="perm_title_post_notif">Service notification</string>
+
+    <!-- SetupActivity — permission card descriptions -->
+    <string name="perm_desc_accessibility">Reads the URL bar inside browser windows to detect blocked sites.</string>
+    <string name="perm_desc_overlay">Draws the block screen on top of browsers when a rule matches.</string>
+    <string name="perm_desc_usage_stats">Detects which browser is in the foreground without an accessibility event.</string>
+    <string name="perm_desc_notif_listener">Hides browser notifications while a block session is active.</string>
+    <string name="perm_desc_device_admin">Locks the device if blocking is bypassed (optional hardening).</string>
+    <string name="perm_desc_post_notif">Shows a persistent notification while BrowserBlock is monitoring.</string>
+
+    <!-- Badge text -->
+    <string name="badge_granted">Granted</string>
+    <string name="badge_required">Required</string>
+    <string name="badge_recommended">Recommended</string>
+    <string name="badge_optional">Optional</string>
+    <string name="badge_granted_check">✓</string>
 
     <!-- Permission labels (shown in the setup checklist) -->
     <string name="permission_usage_stats_label">Usage access</string>
@@ -48,6 +71,7 @@
     <!-- General UI -->
     <string name="button_continue">Continue</string>
     <string name="button_grant">Grant</string>
+    <string name="button_enable">Enable</string>
     <string name="button_skip">Skip</string>
     <string name="button_done">Done</string>
     <string name="button_open_settings">Open settings</string>

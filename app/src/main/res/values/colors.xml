@@ -16,4 +16,9 @@
 
     <!-- Block screen overlay (semi-transparent dark scrim) -->
     <color name="block_overlay_scrim">#CC000000</color>
+
+    <!-- SetupActivity badges -->
+    <color name="badge_granted_bg">#4CAF50</color>
+    <color name="badge_required_bg">#F44336</color>
+    <color name="badge_recommended_bg">#FF9800</color>
 </resources>

@@ -16,6 +16,7 @@ class BrowserBlockApp : Application() {
 
     override fun onCreate() {
         super.onCreate()
+        AppPreferences.init(this)
         createNotificationChannels()
     }
 
