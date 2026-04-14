@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ─── Permissions ────────────────────────────────────────────── -->
+
+    <!-- Draw system overlays over other apps (block screen) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
+    <!-- Post status-bar notification for the foreground service (API 33+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Foreground service base + special-use type declaration -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+
+    <!-- Restart after device boot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Read app-usage statistics to determine foreground app -->
+    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
+
+    <!-- Enumerate installed apps to build the watched-app list -->
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+
+    <!-- ─── Application ───────────────────────────────────────────── -->
+
+    <application
+        android:name=".BrowserBlockApp"
+        android:allowBackup="false"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.BrowserBlock">
+
+        <!-- ── SetupActivity — LAUNCHER entry point ─────────────── -->
+        <activity
+            android:name=".SetupActivity"
+            android:exported="true"
+            android:windowSoftInputMode="adjustResize">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ── MainActivity — reached after setup is complete ──── -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false" />
+
+        <!-- ── BlockActivity — shown as a lock screen overlay ───── -->
+        <!--   singleTop: re-use existing instance if already on top  -->
+        <!--   excludeFromRecents: never appears in the recents drawer -->
+        <activity
+            android:name=".BlockActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:showOnLockScreen="true"
+            android:taskAffinity="com.example.browserblock.block"
+            android:theme="@style/Theme.BrowserBlock.Block" />
+
+        <!-- ── BlockerAccessibilityService ──────────────────────── -->
+        <service
+            android:name=".BlockerAccessibilityService"
+            android:exported="true"
+            android:label="@string/accessibility_service_label"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/accessibility_service_config" />
+        </service>
+
+        <!-- ── ForegroundPollingService ─────────────────────────── -->
+        <!--   Declared foregroundServiceType="specialUse"; the       -->
+        <!--   PROPERTY_SPECIAL_USE_FGS_SUBTYPE justification is      -->
+        <!--   required when targeting API 34+.                       -->
+        <service
+            android:name=".ForegroundPollingService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Monitors the foreground browser app to enforce user-configured URL blocking rules for digital wellbeing." />
+        </service>
+
+        <!-- ── NotificationListenerService ──────────────────────── -->
+        <service
+            android:name=".BlockerNotificationListenerService"
+            android:exported="true"
+            android:label="@string/notification_listener_label"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
+        <!-- ── OpenElsewhereDeviceAdmin ──────────────────────────── -->
+        <receiver
+            android:name=".OpenElsewhereDeviceAdmin"
+            android:description="@string/device_admin_description"
+            android:exported="true"
+            android:label="@string/device_admin_label"
+            android:permission="android.permission.BIND_DEVICE_ADMIN">
+            <intent-filter>
+                <action android:name="android.app.action.DEVICE_ADMIN_ENABLED" />
+            </intent-filter>
+            <meta-data
+                android:name="android.app.device_admin"
+                android:resource="@xml/device_admin" />
+        </receiver>
+
+        <!-- ── BootReceiver ──────────────────────────────────────── -->
+        <!--   Restart the polling service after device reboot.       -->
+        <receiver
+            android:name=".BootReceiver"
+            android:exported="false">
+            <intent-filter android:priority="999">
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <!-- Honour HTC/OnePlus quick-boot as well -->
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="com.htc.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- ── PowerSaveReceiver ─────────────────────────────────── -->
+        <!--   MUST be manifest-declared so it fires even when the    -->
+        <!--   app process is dead (ultra battery saver kills it).    -->
+        <!--   Wakes the app when power-save mode is DEACTIVATED so   -->
+        <!--   we can restart ForegroundPollingService immediately.   -->
+        <receiver
+            android:name=".PowerSaveReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
+            </intent-filter>
+        </receiver>
+
+    </application>
+</manifest>

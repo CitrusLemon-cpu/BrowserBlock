@@ -1,0 +1,29 @@
+<resources>
+    <!-- Base application theme — Material3 / Material You -->
+    <style name="Theme.BrowserBlock" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/md_theme_primary</item>
+        <item name="colorOnPrimary">@color/md_theme_on_primary</item>
+        <item name="colorPrimaryContainer">@color/md_theme_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/md_theme_on_primary_container</item>
+        <item name="colorSecondary">@color/md_theme_secondary</item>
+        <item name="colorOnSecondary">@color/md_theme_on_secondary</item>
+        <item name="colorError">@color/md_theme_error</item>
+        <item name="colorOnError">@color/md_theme_on_error</item>
+        <item name="android:colorBackground">@color/md_theme_surface</item>
+        <item name="colorOnBackground">@color/md_theme_on_surface</item>
+    </style>
+
+    <!-- BlockActivity theme — full-screen translucent overlay -->
+    <style name="Theme.BrowserBlock.Block" parent="Theme.BrowserBlock">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@color/block_overlay_scrim</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowFullscreen">true</item>
+    </style>
+
+    <!-- Splash / loading screen (used as the starting theme) -->
+    <style name="Theme.BrowserBlock.Starting" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/md_theme_primary_container</item>
+        <item name="postSplashScreenTheme">@style/Theme.BrowserBlock</item>
+    </style>
+</resources>

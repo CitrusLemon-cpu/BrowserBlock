@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Accessibility service configuration for BlockerAccessibilityService.
+
+    Key choices:
+    - typeWindowStateChanged: fires when the foreground window/activity changes,
+      letting us detect a browser becoming the top window.
+    - typeWindowContentChanged + subtreeWithFenomenalityForContent: lets us read
+      the URL bar text from within a browser window.
+    - flagRetrieveInteractiveWindows: access content from all windows, not just
+      the active one (needed to read the URL bar even if focus is elsewhere).
+    - flagRequestFilterKeyEvents: intercept hardware key events if we ever need
+      to block the back button during a lock screen.
+    - canRetrieveWindowContent="true": mandatory for reading URL bar node info.
+
+    packageNames is left empty — we watch all packages and filter in code
+    using WatchedApps so the list stays dynamic.
+-->
+<accessibility-service
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeWindowStateChanged|typeWindowContentChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows|flagRequestFilterKeyEvents"
+    android:canPerformGestures="false"
+    android:canRetrieveWindowContent="true"
+    android:description="@string/accessibility_service_description"
+    android:notificationTimeout="50"
+    android:settingsActivity="com.example.browserblock.SetupActivity" />

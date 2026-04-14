@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Device administrator policy declaration for OpenElsewhereDeviceAdmin.
+
+    Capabilities granted here are the maximum the admin can request;
+    the user still confirms each capability at activation time.
+
+    - USES_POLICY_FORCE_LOCK: lets the app lock the screen immediately,
+      which can be used as a hard enforcement fallback.
+    - USES_POLICY_WIPE_DATA: included as a deterrent option (requires
+      explicit user confirmation to activate in Settings).
+
+    The human-visible description is shown in the Device Admin activation
+    dialog — keep it honest and specific to build user trust.
+-->
+<device-admin xmlns:android="http://schemas.android.com/apk/res/android">
+    <uses-policies>
+        <force-lock />
+    </uses-policies>
+</device-admin>

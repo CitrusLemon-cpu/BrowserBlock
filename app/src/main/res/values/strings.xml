@@ -1,0 +1,54 @@
+<resources>
+    <string name="app_name">BrowserBlock</string>
+
+    <!-- SetupActivity -->
+    <string name="setup_title">Set up BrowserBlock</string>
+    <string name="setup_subtitle">Grant the required permissions to get started.</string>
+
+    <!-- Permission labels (shown in the setup checklist) -->
+    <string name="permission_usage_stats_label">Usage access</string>
+    <string name="permission_usage_stats_rationale">Required to detect which browser app is in the foreground.</string>
+    <string name="permission_overlay_label">Draw over other apps</string>
+    <string name="permission_overlay_rationale">Required to show the block screen on top of browsers.</string>
+    <string name="permission_accessibility_label">Accessibility service</string>
+    <string name="permission_accessibility_rationale">Required to read URL bar content inside browser windows.</string>
+    <string name="permission_notification_listener_label">Notification access</string>
+    <string name="permission_notification_listener_rationale">Optional — used to suppress browser notifications during a block session.</string>
+    <string name="permission_battery_optimization_label">Disable battery optimisation</string>
+    <string name="permission_battery_optimization_rationale">Keeps the blocking service running during aggressive power-save modes.</string>
+    <string name="permission_post_notifications_label">Post notifications</string>
+    <string name="permission_post_notifications_rationale">Shows a persistent notification while blocking is active (required on Android 13+).</string>
+    <string name="permission_device_admin_label">Device administrator</string>
+    <string name="permission_device_admin_rationale">Optional — allows locking the screen as a hard enforcement fallback.</string>
+
+    <!-- Accessibility service strings (shown in system Settings) -->
+    <string name="accessibility_service_label">BrowserBlock</string>
+    <string name="accessibility_service_description">Monitors browser windows to enforce your URL blocking rules. No personal data is collected or transmitted.</string>
+
+    <!-- Notification listener strings -->
+    <string name="notification_listener_label">BrowserBlock notifications</string>
+
+    <!-- Device admin strings (shown in the activation dialog) -->
+    <string name="device_admin_label">BrowserBlock</string>
+    <string name="device_admin_description">Allows BrowserBlock to lock the screen when a blocked URL is detected and the blocking rules are set to hard-lock mode.</string>
+
+    <!-- ForegroundPollingService notification -->
+    <string name="notification_channel_id">browserblock_blocking</string>
+    <string name="notification_channel_name">Blocking active</string>
+    <string name="notification_channel_description">Shown while BrowserBlock is monitoring for blocked URLs.</string>
+    <string name="notification_title">BrowserBlock active</string>
+    <string name="notification_text">Monitoring browsers for blocked content.</string>
+
+    <!-- BlockActivity -->
+    <string name="block_title">Site blocked</string>
+    <string name="block_message">This site is on your blocked list.</string>
+    <string name="block_button_go_back">Go back</string>
+    <string name="block_button_open_elsewhere">Open in allowed browser</string>
+
+    <!-- General UI -->
+    <string name="button_continue">Continue</string>
+    <string name="button_grant">Grant</string>
+    <string name="button_skip">Skip</string>
+    <string name="button_done">Done</string>
+    <string name="button_open_settings">Open settings</string>
+</resources>
