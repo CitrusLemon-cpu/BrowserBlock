@@ -21,9 +21,5 @@
         <item name="android:windowFullscreen">true</item>
     </style>
 
-    <!-- Splash / loading screen (used as the starting theme) -->
-    <style name="Theme.BrowserBlock.Starting" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/md_theme_primary_container</item>
-        <item name="postSplashScreenTheme">@style/Theme.BrowserBlock</item>
-    </style>
+    <style name="Theme.BrowserBlock.Starting" parent="Theme.BrowserBlock" />
 </resources>

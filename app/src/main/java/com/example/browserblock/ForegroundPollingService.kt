@@ -49,6 +49,7 @@ class ForegroundPollingService : Service() {
         private const val POLL_INTERVAL_MS = 500L
 
         const val ACTION_START = "com.example.browserblock.action.START_POLLING"
+        @Volatile var instance: ForegroundPollingService? = null
 
         /** Safe to call from any context — idempotent if already running. */
         fun start(context: Context) {
@@ -78,6 +79,7 @@ class ForegroundPollingService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForegroundWithNotification()
+        instance = this
         overlayManager = BlockOverlayManager(this)
         registerAccessibilityObserver()
     }
@@ -105,6 +107,7 @@ class ForegroundPollingService : Service() {
             contentResolver.unregisterContentObserver(it)
             accessibilityObserver = null
         }
+        if (instance === this) instance = null
         super.onDestroy()
     }
 
