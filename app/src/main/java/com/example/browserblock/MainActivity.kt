@@ -88,6 +88,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        ForegroundPollingService.start(this)
         binding.switchPause.isChecked = !AppPreferences.isPaused
         refreshStatusCard()
         if (allApps.isNotEmpty()) {

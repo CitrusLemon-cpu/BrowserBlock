@@ -85,15 +85,14 @@ class ForegroundPollingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d(TAG, "onStartCommand — accessibility=${isAccessibilityServiceEnabled()}")
+        Log.d(
+            TAG,
+            "onStartCommand — accessibilityInstance=${BlockerAccessibilityService.instance != null}"
+        )
 
-        if (isAccessibilityServiceEnabled()) {
-            // Accessibility is alive — this service is not needed right now.
-            // Stop self; the accessibility service handles blocking.
-            Log.d(TAG, "Accessibility active, stopping self.")
-            stopSelf()
+        if (BlockerAccessibilityService.instance != null) {
+            Log.d(TAG, "Accessibility instance alive — polling service on standby.")
         } else {
-            // Accessibility is not available — enter polling/hard-block mode.
             startPollingLoop()
         }
 
@@ -126,14 +125,14 @@ class ForegroundPollingService : Service() {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 if (isAccessibilityServiceEnabled()) {
-                    Log.d(TAG, "Accessibility re-enabled — stopping ForegroundPollingService.")
+                    Log.d(TAG, "Accessibility re-enabled — stopping polling, staying on standby.")
                     overlayManager.dismiss()
+                    BlockActivity.finishIfShowing()
                     getSystemService(NotificationManager::class.java)
                         ?.cancel(PowerSaveReceiver.REMINDER_NOTIFICATION_ID)
                     stopPollingLoop()
-                    stopSelf()
                 } else {
-                    Log.d(TAG, "Accessibility disabled — switching to hard-block polling mode.")
+                    Log.d(TAG, "Accessibility disabled — entering hard-block polling mode.")
                     startPollingLoop()
                 }
             }
@@ -178,19 +177,24 @@ class ForegroundPollingService : Service() {
         val pkg = UsageStatsHelper.getForegroundPackage(this) ?: return
 
         if (AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
-            // Accessibility service is alive — it owns blocking via BlockActivity.
-            // Do not show the overlay here; that would double-block.
             if (BlockerAccessibilityService.instance == null) {
-                Log.d(TAG, "Hard-block overlay: accessibility off, showing overlay for $pkg")
-                overlayManager.show()
+                if (Settings.canDrawOverlays(this)) {
+                    Log.d(TAG, "Hard-block overlay: accessibility off, showing overlay for $pkg")
+                    overlayManager.show()
+                } else if (BlockActivity.instance == null) {
+                    Log.d(TAG, "No overlay permission — launching BlockActivity for $pkg")
+                    startActivity(
+                        Intent(this, BlockActivity::class.java).apply {
+                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                        }
+                    )
+                }
             }
         } else {
-            // User left watched app, or blocking is paused → dismiss overlay.
             overlayManager.dismiss()
+            if (BlockerAccessibilityService.instance == null) BlockActivity.finishIfShowing()
         }
     }
-
-    // ── Accessibility check ─────────────────────────────────────────────────
 
     private fun isAccessibilityServiceEnabled(): Boolean {
         val enabled = Settings.Secure.getString(
