@@ -6,7 +6,6 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import androidx.core.content.ContextCompat
 
 /**
  * BootReceiver — restarts [ForegroundPollingService] after device boot.
@@ -19,10 +18,14 @@ import androidx.core.content.ContextCompat
  * Declared with android:priority="999" so it fires before other receivers.
  * Exported: false — only the system can trigger it.
  *
+ * Always starts [ForegroundPollingService] on boot regardless of which permissions
+ * are currently granted. The service checks permissions internally and degrades
+ * gracefully — if accessibility is enabled it stops itself immediately; if
+ * PACKAGE_USAGE_STATS is missing it skips polling ticks silently.
+ *
  * Guard (from Block APK analysis — BootReceiver.onReceive):
  *  On API 35+, checks [ApplicationStartInfo.wasForceStopped]. If the user
  *  explicitly force-stopped the app, we respect that and do NOT auto-restart.
- *  This prevents an infinite restart loop when the user intends to stop the app.
  */
 class BootReceiver : BroadcastReceiver() {
 
@@ -43,10 +46,7 @@ class BootReceiver : BroadcastReceiver() {
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private fun startPollingService(context: Context) {
-        val serviceIntent = Intent(context, ForegroundPollingService::class.java).apply {
-            action = ForegroundPollingService.ACTION_START
-        }
-        ContextCompat.startForegroundService(context, serviceIntent)
+        ForegroundPollingService.start(context)
     }
 
     @Suppress("NewApi") // guarded by Build.VERSION.SDK_INT >= 35 at call site
