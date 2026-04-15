@@ -82,6 +82,7 @@ class ForegroundPollingService : Service() {
         instance = this
         overlayManager = BlockOverlayManager(this)
         registerAccessibilityObserver()
+        ServiceRestartWorker.ensureScheduled(this)
         AlarmKeepaliveReceiver.schedule(this)
     }
 

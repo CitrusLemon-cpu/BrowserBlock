@@ -58,5 +58,6 @@ class AlarmKeepaliveReceiver : BroadcastReceiver() {
             ForegroundPollingService.start(context)
         }
         schedule(context)
+        ServiceRestartWorker.ensureScheduled(context)
     }
 }

@@ -55,6 +55,7 @@ class BootReceiver : BroadcastReceiver() {
 
     private fun startPollingService(context: Context) {
         ForegroundPollingService.start(context)
+        ServiceRestartWorker.ensureScheduled(context)
         AlarmKeepaliveReceiver.schedule(context)
     }
 

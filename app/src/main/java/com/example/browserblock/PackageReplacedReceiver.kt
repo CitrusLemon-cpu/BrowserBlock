@@ -9,5 +9,6 @@ class PackageReplacedReceiver : BroadcastReceiver() {
         if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
         ForegroundPollingService.start(context)
         AlarmKeepaliveReceiver.schedule(context)
+        ServiceRestartWorker.ensureScheduled(context)
     }
 }
