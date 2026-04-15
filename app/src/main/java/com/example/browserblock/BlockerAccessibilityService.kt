@@ -236,6 +236,11 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private fun postDebugNotification(packageName: String, className: String) {
         val packageShortName = packageName.substringAfterLast('.')
+        val classShortName = if (className.startsWith("$packageName.")) {
+            className.removePrefix("$packageName.")
+        } else {
+            className.substringAfterLast('.')
+        }
         val blockIntent = Intent(ACTION_DEBUG_BLOCK).apply {
             setPackage(this@BlockerAccessibilityService.packageName)
             putExtra(EXTRA_PACKAGE, packageName)
@@ -259,8 +264,8 @@ class BlockerAccessibilityService : AccessibilityService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
         val notification = NotificationCompat.Builder(this, DEBUG_NOTIFICATION_CHANNEL_ID)
-            .setContentTitle("[$packageShortName] → $className")
-            .setContentText(className)
+            .setContentTitle("[$packageShortName] → $classShortName")
+            .setContentText(classShortName)
             .setSubText(packageName)
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setPriority(NotificationCompat.PRIORITY_LOW)
