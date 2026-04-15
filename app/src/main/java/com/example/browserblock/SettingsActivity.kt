@@ -26,6 +26,7 @@ class SettingsActivity : AppCompatActivity() {
         setupDebugSwitch()
         setupResetButton()
         setupPermissionButtons()
+        setupTroubleshootingButtons()
     }
 
     override fun onResume() {
@@ -117,6 +118,74 @@ class SettingsActivity : AppCompatActivity() {
         return dpm.isAdminActive(ComponentName(this, OpenElsewhereDeviceAdmin::class.java))
     }
 
+    private fun openOemAutoStartSettings() {
+        val manufacturer = Build.MANUFACTURER.lowercase()
+        val intents = when {
+            manufacturer.contains("samsung") -> listOf(
+                Intent().setClassName(
+                    "com.samsung.android.lool",
+                    "com.samsung.android.sm.ui.battery.BatteryActivity"
+                ),
+                Intent().setClassName(
+                    "com.samsung.android.sm",
+                    "com.samsung.android.sm.ui.battery.BatteryActivity"
+                )
+            )
+            manufacturer.contains("xiaomi") || manufacturer.contains("redmi") -> listOf(
+                Intent().setClassName(
+                    "com.miui.powerkeeper",
+                    "com.miui.powerkeeper.ui.HideAppsContainerManagementActivity"
+                ),
+                Intent().setClassName(
+                    "com.miui.securitycenter",
+                    "com.miui.permcenter.autostart.AutoStartManagementActivity"
+                )
+            )
+            manufacturer.contains("huawei") || manufacturer.contains("honor") -> listOf(
+                Intent().setClassName(
+                    "com.huawei.systemmanager",
+                    "com.huawei.systemmanager.startupmgr.ui.StartupNormalAppListActivity"
+                ),
+                Intent().setClassName(
+                    "com.huawei.systemmanager",
+                    "com.huawei.systemmanager.optimize.process.ProtectActivity"
+                )
+            )
+            manufacturer.contains("oneplus") -> listOf(
+                Intent().setClassName(
+                    "com.oneplus.security",
+                    "com.oneplus.security.OPMainActivity"
+                )
+            )
+            manufacturer.contains("oppo") -> listOf(
+                Intent().setClassName(
+                    "com.coloros.safecenter",
+                    "com.coloros.safecenter.permission.startup.StartupAppListActivity"
+                )
+            )
+            manufacturer.contains("vivo") -> listOf(
+                Intent().setClassName(
+                    "com.iqoo.secure",
+                    "com.iqoo.secure.ui.phoneoptimize.AddWhiteListActivity"
+                )
+            )
+            else -> emptyList()
+        }
+
+        val launched = intents.any { intent ->
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            try {
+                startActivity(intent)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+        if (!launched) {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+    }
+
     private fun setupPermissionButtons() {
         binding.btnFixAccessibility.setOnClickListener {
             startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
@@ -147,6 +216,15 @@ class SettingsActivity : AppCompatActivity() {
                 )
             }
             startActivity(intent)
+        }
+    }
+
+    private fun setupTroubleshootingButtons() {
+        binding.btnFixBattery.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+        }
+        binding.btnFixOemAutostart.setOnClickListener {
+            openOemAutoStartSettings()
         }
     }
 

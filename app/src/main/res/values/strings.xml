@@ -108,6 +108,7 @@
 
     <!-- Settings screen section headers -->
     <string name="settings_section_permissions">Permissions</string>
+    <string name="settings_section_troubleshooting">Troubleshooting</string>
     <string name="settings_section_debug">Debug</string>
     <string name="settings_section_service">Service status</string>
     <string name="settings_section_danger">Danger zone</string>
@@ -121,6 +122,12 @@
     <!-- Settings screen buttons -->
     <string name="settings_btn_fix">Fix</string>
     <string name="settings_btn_reset">Reset all settings</string>
+
+    <!-- Settings — Troubleshooting section -->
+    <string name="settings_troubleshooting_battery_label">Battery optimisation</string>
+    <string name="settings_troubleshooting_battery_desc">Lets BrowserBlock run in the background without being throttled. Required for reliable auto-start after reboot.</string>
+    <string name="settings_troubleshooting_oem_label">Background auto-start (OEM)</string>
+    <string name="settings_troubleshooting_oem_desc">Samsung, Xiaomi, Huawei, and OnePlus restrict which apps can restart after a reboot. Tap Fix to open your device\'s auto-start settings.</string>
 
     <!-- Settings badge labels -->
     <string name="settings_badge_active">Active</string>

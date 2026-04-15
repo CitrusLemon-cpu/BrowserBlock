@@ -31,22 +31,31 @@ class BootReceiver : BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action ?: return
-
         if (action != Intent.ACTION_BOOT_COMPLETED &&
             action != "android.intent.action.QUICKBOOT_POWERON" &&
             action != "com.htc.intent.action.QUICKBOOT_POWERON"
         ) return
-
-        // Guard: do not restart if the user force-stopped the app (API 35+)
         if (Build.VERSION.SDK_INT >= 35 && wasAppForceStopped(context)) return
 
+        val pm = context.getSystemService(android.os.PowerManager::class.java)
+        val wl = pm?.newWakeLock(
+            android.os.PowerManager.PARTIAL_WAKE_LOCK,
+            "BrowserBlock:BootReceiver"
+        )
+        wl?.acquire(10_000L)
+
         startPollingService(context)
+
+        if (wl?.isHeld == true) {
+            wl.release()
+        }
     }
 
     // ── Helpers ─────────────────────────────────────────────────────────────
 
     private fun startPollingService(context: Context) {
         ForegroundPollingService.start(context)
+        AlarmKeepaliveReceiver.schedule(context)
     }
 
     @Suppress("NewApi") // guarded by Build.VERSION.SDK_INT >= 35 at call site
