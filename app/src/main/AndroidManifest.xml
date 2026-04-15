@@ -147,7 +147,7 @@
         <!--   we can restart ForegroundPollingService immediately.   -->
         <receiver
             android:name=".PowerSaveReceiver"
-            android:exported="false">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
             </intent-filter>
