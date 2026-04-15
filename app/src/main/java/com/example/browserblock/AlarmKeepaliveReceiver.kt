@@ -50,13 +50,8 @@ class AlarmKeepaliveReceiver : BroadcastReceiver() {
     }
 
     override fun onReceive(context: Context, intent: Intent) {
-        Log.d(TAG, "Alarm fired — checking service.")
-        if (ForegroundPollingService.instance == null &&
-            BlockerAccessibilityService.instance == null
-        ) {
-            Log.d(TAG, "Service dead — restarting ForegroundPollingService.")
-            ForegroundPollingService.start(context)
-        }
+        Log.d(TAG, "Alarm fired — restarting service.")
+        ForegroundPollingService.start(context)
         schedule(context)
         ServiceRestartWorker.ensureScheduled(context)
     }
