@@ -51,6 +51,10 @@
         <activity
             android:name=".MainActivity"
             android:exported="false" />
+        <activity
+            android:name=".SettingsActivity"
+            android:exported="false"
+            android:parentActivityName=".MainActivity" />
 
         <!-- ── BlockActivity — shown as a lock screen overlay ───── -->
         <!--   singleTop: re-use existing instance if already on top  -->
