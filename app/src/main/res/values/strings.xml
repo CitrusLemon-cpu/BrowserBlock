@@ -106,6 +106,36 @@
     <!-- MainActivity search -->
     <string name="search_hint">Search apps…</string>
 
+    <!-- Settings screen section headers -->
+    <string name="settings_section_permissions">Permissions</string>
+    <string name="settings_section_debug">Debug</string>
+    <string name="settings_section_service">Service status</string>
+    <string name="settings_section_danger">Danger zone</string>
+
+    <!-- Settings screen labels -->
+    <string name="settings_debug_label">Debug mode</string>
+    <string name="settings_debug_warning">Posts a notification for every screen transition in watched apps. Turn off when done building your allowlist.</string>
+    <string name="settings_service_accessibility">Accessibility service</string>
+    <string name="settings_service_polling">Fallback polling service</string>
+
+    <!-- Settings screen buttons -->
+    <string name="settings_btn_fix">Fix</string>
+    <string name="settings_btn_reset">Reset all settings</string>
+
+    <!-- Settings badge labels -->
+    <string name="settings_badge_active">Active</string>
+    <string name="settings_badge_missing">Missing</string>
+    <string name="settings_badge_optional">Optional</string>
+
+    <!-- Overflow menu -->
+    <string name="menu_settings">Settings</string>
+
+    <!-- Reset confirmation dialog -->
+    <string name="settings_reset_title">Reset all settings?</string>
+    <string name="settings_reset_message">This will clear all watched apps, allowlists, and preferences. The app will restart.</string>
+    <string name="settings_reset_confirm">Reset</string>
+    <string name="settings_reset_cancel">Cancel</string>
+
     <!-- General UI -->
     <string name="button_continue">Continue</string>
     <string name="button_grant">Grant</string>

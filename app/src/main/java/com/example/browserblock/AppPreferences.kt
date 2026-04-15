@@ -263,4 +263,8 @@ object AppPreferences {
             "[]"
         }
     }
+
+    fun resetAll() {
+        prefs.edit { clear() }
+    }
 }
