@@ -58,4 +58,48 @@ object WatchedApps {
         "com.miui.home",                       // MIUI launcher
         "com.huawei.android.launcher",        // Huawei launcher
     )
+
+    /**
+     * Activity class name keywords used in [BlockingMode.KEYWORD] mode.
+     * A window is considered a browser activity if its className contains
+     * any of these strings (case-sensitive, as returned by the system).
+     */
+    val BROWSER_KEYWORDS: Set<String> = setOf(
+        "WebView",
+        "Browser",
+        "H5",
+        "Web",
+        "Url",
+    )
+
+    /**
+     * Curated per-package allowlists of Activity class names that should NOT be
+     * blocked even when the package is watched.
+     *
+     * These are typically Settings, Downloads, History, or other benign activities
+     * that share the browser process but are not browsing screens.
+     *
+     * Keys are package names from [DEFAULT_BROWSERS].
+     * Values are sets of fully-qualified Activity class names.
+     */
+    val curatedAllowedActivities: Map<String, Set<String>> = mapOf(
+        "com.android.chrome" to setOf(
+            "com.google.android.apps.chrome.Main",
+            "org.chromium.chrome.browser.settings.SettingsActivity",
+            "org.chromium.chrome.browser.download.DownloadActivity",
+        ),
+        "org.mozilla.firefox" to setOf(
+            "org.mozilla.fenix.settings.SettingsActivity",
+            "org.mozilla.fenix.downloads.DownloadActivity",
+        ),
+        "com.microsoft.emmx" to setOf(
+            "com.microsoft.emmx.settings.SettingsActivity",
+        ),
+        "com.brave.browser" to setOf(
+            "org.chromium.chrome.browser.settings.SettingsActivity",
+        ),
+        "com.samsung.android.app.sbrowser" to setOf(
+            "com.sec.android.app.sbrowser.settings.BrowserSettingsActivity",
+        ),
+    )
 }

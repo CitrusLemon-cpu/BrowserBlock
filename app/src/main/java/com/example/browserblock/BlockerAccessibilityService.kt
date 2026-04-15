@@ -2,80 +2,272 @@ package com.example.browserblock
 
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.ComponentName
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.SharedPreferences
+import android.database.ContentObserver
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
 import android.view.accessibility.AccessibilityEvent
-import android.view.accessibility.AccessibilityNodeInfo
+import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
-/**
- * BlockerAccessibilityService — watchdog + URL reader.
- *
- * Two roles, both implemented here to leverage the fact that accessibility
- * services run at elevated priority and survive most battery-saver kills:
- *
- * ROLE 1 — Foreground-app detection:
- *   Receives [AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED] when the top
- *   Activity/window changes. Used to detect when a watched browser becomes
- *   the foreground app so we can start/stop URL monitoring accordingly.
- *
- * ROLE 2 — URL bar reading:
- *   Receives [AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED] to detect
- *   text changes in the browser address bar. The node tree is traversed
- *   to find an editable URL node (typically ViewId "url_bar", "url_field",
- *   or similar) and its text is compared against [WatchedApps] + prefs.
- *
- * ROLE 3 — Service watchdog (from APK analysis):
- *   On [onServiceConnected] / [onInterrupt], checks whether
- *   [ForegroundPollingService] is running and starts it if not.
- *   Mirrors Block's qe2.mo5977k() pattern.
- *
- * Service is declared in the manifest with:
- *   android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
- * and configured via @xml/accessibility_service_config.
- *
- * Logic to be implemented in a later step.
- */
 class BlockerAccessibilityService : AccessibilityService() {
 
-    // ── Lifecycle ───────────────────────────────────────────────────────────
+    companion object {
+        private const val DEBUG_NOTIFICATION_CHANNEL_ID = "browserblock_debug"
+        const val ACTION_DEBUG_BLOCK = "com.example.browserblock.DEBUG_BLOCK"
+        const val ACTION_DEBUG_ALLOW = "com.example.browserblock.DEBUG_ALLOW"
+        const val EXTRA_PACKAGE = "extra_package"
+        const val EXTRA_CLASS = "extra_class"
+
+        @Volatile var instance: BlockerAccessibilityService? = null
+    }
+
+    private val handler = Handler(Looper.getMainLooper())
+
+    private var isBlockingActive = false
+    private var accessibilitySettingsObserver: ContentObserver? = null
+
+    private val blockEnforceRunnable = object : Runnable {
+        override fun run() {
+            if (!isBlockingActive) return
+            if (!AppPreferences.isPaused && BlockActivity.instance == null) {
+                val intent = Intent(this@BlockerAccessibilityService, BlockActivity::class.java)
+                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP) }
+                startActivity(intent)
+            }
+            handler.postDelayed(this, 1_000L)
+        }
+    }
+
+    private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
+        if (AppPreferences.isPaused) {
+            isBlockingActive = false
+            handler.removeCallbacks(blockEnforceRunnable)
+            BlockActivity.finishIfShowing()
+            handler.removeCallbacks(usageStatsCheckRunnable)
+        }
+    }
+
+    private val debugActionReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: android.content.Context, intent: Intent) {
+            val pkg = intent.getStringExtra(EXTRA_PACKAGE) ?: return
+            val cls = intent.getStringExtra(EXTRA_CLASS) ?: return
+            when (intent.action) {
+                ACTION_DEBUG_BLOCK -> AppPreferences.addUserBlockedActivity(pkg, cls)
+                ACTION_DEBUG_ALLOW -> AppPreferences.addUnblockedActivity(pkg, cls)
+            }
+        }
+    }
+
+    private val usageStatsCheckRunnable = object : Runnable {
+        override fun run() {
+            if (BlockActivity.instance == null) return
+            val foreground = UsageStatsHelper.getForegroundPackage(this@BlockerAccessibilityService)
+            if (foreground != null &&
+                !AppPreferences.isWatched(foreground) &&
+                foreground != applicationContext.packageName
+            ) {
+                isBlockingActive = false
+                handler.removeCallbacks(blockEnforceRunnable)
+                BlockActivity.finishIfShowing()
+                handler.removeCallbacks(this)
+            } else {
+                handler.postDelayed(this, 2_000L)
+            }
+        }
+    }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
-        // TODO: configure dynamic service info if needed at runtime
-        // TODO: check if ForegroundPollingService is running; start it if not
-        //       (watchdog pattern — see APK analysis notes)
+        instance = this
+        AppPreferences.registerListener(preferenceListener)
+
+        val channel = NotificationChannel(
+            DEBUG_NOTIFICATION_CHANNEL_ID,
+            "Debug — Activity Names",
+            NotificationManager.IMPORTANCE_LOW
+        )
+        getSystemService(NotificationManager::class.java).createNotificationChannel(channel)
+
+        val filter = IntentFilter().apply {
+            addAction(ACTION_DEBUG_BLOCK)
+            addAction(ACTION_DEBUG_ALLOW)
+        }
+        ContextCompat.registerReceiver(
+            this,
+            debugActionReceiver,
+            filter,
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
+
+        serviceInfo = serviceInfo?.also { info ->
+            info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            info.notificationTimeout = 100
+        }
+
+        val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
+            override fun onChange(selfChange: Boolean) {
+                val enabledServices = Settings.Secure.getString(
+                    contentResolver,
+                    Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+                ) ?: ""
+                val thisComponent = ComponentName(
+                    this@BlockerAccessibilityService,
+                    BlockerAccessibilityService::class.java
+                )
+                val flatFull = thisComponent.flattenToString()
+                val flatShort = thisComponent.flattenToShortString()
+                val stillEnabled = enabledServices.split(":").any { entry ->
+                    entry.equals(flatFull, ignoreCase = true) ||
+                        entry.equals(flatShort, ignoreCase = true)
+                }
+                if (!stillEnabled) {
+                    stopSelf()
+                }
+            }
+        }
+        accessibilitySettingsObserver = observer
+        contentResolver.registerContentObserver(
+            Settings.Secure.getUriFor(Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES),
+            false,
+            observer
+        )
     }
 
-    override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-        // TODO: handle TYPE_WINDOW_STATE_CHANGED → detect foreground browser
-        // TODO: handle TYPE_WINDOW_CONTENT_CHANGED → read URL bar, evaluate rules
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+
+        if (AppPreferences.isPaused) {
+            isBlockingActive = false
+            handler.removeCallbacks(blockEnforceRunnable)
+            BlockActivity.finishIfShowing()
+            handler.removeCallbacks(usageStatsCheckRunnable)
+            return
+        }
+
+        val packageName = event.packageName?.toString() ?: return
+        val className = event.className?.toString() ?: return
+
+        if (className.startsWith("android.widget.") ||
+            className.startsWith("android.view.") ||
+            (className.startsWith("android.app.") && !className.contains("Activity"))
+        ) return
+
+        if (AppPreferences.isDebugMode && AppPreferences.isWatched(packageName)) {
+            postDebugNotification(packageName, className)
+        }
+
+        if (!AppPreferences.isWatched(packageName)) {
+            isBlockingActive = false
+            handler.removeCallbacks(blockEnforceRunnable)
+            BlockActivity.finishIfShowing()
+            handler.removeCallbacks(usageStatsCheckRunnable)
+            return
+        }
+
+        val mode = AppPreferences.getBlockingMode(packageName)
+        val allowedActivities =
+            (WatchedApps.curatedAllowedActivities[packageName] ?: emptySet()) +
+                AppPreferences.getUnblockedActivities(packageName)
+        val userBlocked = AppPreferences.getUserBlockedActivities(packageName)
+
+        val isBrowserActivity = when (mode) {
+            BlockingMode.KEYWORD ->
+                className in userBlocked ||
+                    (className !in allowedActivities &&
+                        WatchedApps.BROWSER_KEYWORDS.any { keyword -> className.contains(keyword) })
+            BlockingMode.ALLOWLIST ->
+                className !in allowedActivities
+        }
+
+        if (isBrowserActivity) {
+            AppPreferences.logBlockedActivity(packageName, className)
+            if (!isBlockingActive) {
+                isBlockingActive = true
+                handler.removeCallbacks(blockEnforceRunnable)
+                handler.post(blockEnforceRunnable)
+            }
+            handler.removeCallbacks(usageStatsCheckRunnable)
+            handler.postDelayed(usageStatsCheckRunnable, 2_000L)
+        } else {
+            if (isBlockingActive) {
+                isBlockingActive = false
+                handler.removeCallbacks(blockEnforceRunnable)
+                BlockActivity.finishIfShowing()
+            }
+            handler.removeCallbacks(usageStatsCheckRunnable)
+        }
     }
 
     override fun onInterrupt() {
-        // Called when the service is interrupted by the system.
-        // TODO: log/track accessibility interruptions for diagnostic purposes
+        isBlockingActive = false
+        handler.removeCallbacks(blockEnforceRunnable)
+        BlockActivity.finishIfShowing()
+        handler.removeCallbacks(usageStatsCheckRunnable)
+        ForegroundPollingService.start(this)
     }
 
-    override fun onUnbind(intent: Intent?): Boolean {
-        // TODO: notify watchdog that accessibility is gone (may restart service)
-        return super.onUnbind(intent)
+    override fun onDestroy() {
+        instance = null
+        isBlockingActive = false
+        handler.removeCallbacks(blockEnforceRunnable)
+        BlockActivity.finishIfShowing()
+        AppPreferences.unregisterListener(preferenceListener)
+        accessibilitySettingsObserver?.let {
+            contentResolver.unregisterContentObserver(it)
+            accessibilitySettingsObserver = null
+        }
+        try {
+            unregisterReceiver(debugActionReceiver)
+        } catch (_: Exception) {
+        }
+        handler.removeCallbacks(usageStatsCheckRunnable)
+        super.onDestroy()
     }
 
-    // ── Helpers (stubs) ─────────────────────────────────────────────────────
-
-    /**
-     * Walk the [AccessibilityNodeInfo] tree rooted at [root] and return the
-     * text content of the first node that looks like a URL bar.
-     *
-     * Common resource-id hints across browsers:
-     *  - Chrome:   "com.android.chrome:id/url_bar"
-     *  - Firefox:  "org.mozilla.firefox:id/mozac_browser_toolbar_url_view"
-     *  - Edge:     "com.microsoft.emmx:id/address_bar_url_text_view"
-     *  - Brave:    "com.brave.browser:id/url_bar"
-     *  - Samsung:  "com.sec.android.app.sbrowser:id/location_bar_edit_text"
-     */
-    @Suppress("UnusedPrivateMember")
-    private fun extractUrlFromNode(root: AccessibilityNodeInfo?): String? {
-        // TODO: implement recursive node traversal
-        return null
+    private fun postDebugNotification(packageName: String, className: String) {
+        val packageShortName = packageName.substringAfterLast('.')
+        val blockIntent = Intent(ACTION_DEBUG_BLOCK).apply {
+            setPackage(this@BlockerAccessibilityService.packageName)
+            putExtra(EXTRA_PACKAGE, packageName)
+            putExtra(EXTRA_CLASS, className)
+        }
+        val allowIntent = Intent(ACTION_DEBUG_ALLOW).apply {
+            setPackage(this@BlockerAccessibilityService.packageName)
+            putExtra(EXTRA_PACKAGE, packageName)
+            putExtra(EXTRA_CLASS, className)
+        }
+        val blockPi = PendingIntent.getBroadcast(
+            this,
+            (packageName + className + "block").hashCode(),
+            blockIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val allowPi = PendingIntent.getBroadcast(
+            this,
+            (packageName + className + "allow").hashCode(),
+            allowIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        val notification = NotificationCompat.Builder(this, DEBUG_NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("[$packageShortName] → $className")
+            .setContentText(className)
+            .setSubText(packageName)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .addAction(0, "Block this", blockPi)
+            .addAction(0, "Allow this", allowPi)
+            .build()
+        getSystemService(NotificationManager::class.java).notify(className.hashCode(), notification)
     }
 }

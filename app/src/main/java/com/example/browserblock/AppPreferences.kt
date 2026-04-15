@@ -29,6 +29,11 @@ object AppPreferences {
     private const val KEY_WATCHED_PACKAGES = "watched_packages"    // JSON array string
     private const val KEY_BLOCKED_KEYWORDS = "blocked_keywords"    // JSON array string
     private const val KEY_ALLOWLIST_URLS = "allowlist_urls"        // JSON array string
+    private const val KEY_IS_PAUSED = "is_paused"
+    private const val KEY_IS_DEBUG_MODE = "is_debug_mode"
+    private const val KEY_USER_BLOCKED_PREFIX = "user_blocked_"
+    private const val KEY_UNBLOCKED_PREFIX = "unblocked_"
+    private const val KEY_PKG_BLOCKING_MODE_PREFIX = "pkg_mode_"
     private const val KEY_IS_BLOCKING_ACTIVE = "is_blocking_active"
     private const val KEY_DEVICE_ADMIN_ENABLED = "device_admin_enabled"
     private const val KEY_NOTIFICATION_LISTENER_ENABLED = "notification_listener_enabled"
@@ -100,4 +105,92 @@ object AppPreferences {
     var allowlistUrlsJson: String
         get() = prefs.getString(KEY_ALLOWLIST_URLS, "[]") ?: "[]"
         set(value) = prefs.edit { putString(KEY_ALLOWLIST_URLS, value) }
+
+    /** Whether blocking is temporarily paused by the user. */
+    var isPaused: Boolean
+        get() = prefs.getBoolean(KEY_IS_PAUSED, false)
+        set(value) = prefs.edit { putBoolean(KEY_IS_PAUSED, value) }
+
+    /** Whether debug mode is active (shows notification for every watched-app Activity). */
+    var isDebugMode: Boolean
+        get() = prefs.getBoolean(KEY_IS_DEBUG_MODE, false)
+        set(value) = prefs.edit { putBoolean(KEY_IS_DEBUG_MODE, value) }
+
+    /**
+     * Returns true if [packageName] is currently being monitored.
+     * Checks both [WatchedApps.DEFAULT_BROWSERS] and any user-added packages.
+     */
+    fun isWatched(packageName: String): Boolean {
+        if (packageName in WatchedApps.NEVER_BLOCK) return false
+        if (packageName in WatchedApps.DEFAULT_BROWSERS) return true
+        return parseJsonStringArray(watchedPackagesJson).contains(packageName)
+    }
+
+    /**
+     * Returns the [BlockingMode] for [packageName].
+     * Falls back to the global [blockingMode] if no per-package override is set.
+     */
+    fun getBlockingMode(packageName: String): BlockingMode {
+        val overrideName = prefs.getString(KEY_PKG_BLOCKING_MODE_PREFIX + packageName, null)
+            ?: return blockingMode
+        return try {
+            BlockingMode.valueOf(overrideName)
+        } catch (_: Exception) {
+            blockingMode
+        }
+    }
+
+    /** Returns the set of Activity class names the user has explicitly allowed for [packageName]. */
+    fun getUnblockedActivities(packageName: String): Set<String> =
+        parseJsonStringArray(prefs.getString(KEY_UNBLOCKED_PREFIX + packageName, "[]") ?: "[]")
+
+    /** Returns the set of Activity class names the user has explicitly blocked for [packageName]. */
+    fun getUserBlockedActivities(packageName: String): Set<String> =
+        parseJsonStringArray(prefs.getString(KEY_USER_BLOCKED_PREFIX + packageName, "[]") ?: "[]")
+
+    /** Adds [className] to the user-blocked activities list for [packageName]. */
+    fun addUserBlockedActivity(packageName: String, className: String) {
+        val key = KEY_USER_BLOCKED_PREFIX + packageName
+        val updated = getUserBlockedActivities(packageName).toMutableSet().also { it.add(className) }
+        prefs.edit { putString(key, setToJsonArray(updated)) }
+    }
+
+    /** Adds [className] to the explicitly-allowed (unblocked) activities for [packageName]. */
+    fun addUnblockedActivity(packageName: String, className: String) {
+        val key = KEY_UNBLOCKED_PREFIX + packageName
+        val updated = getUnblockedActivities(packageName).toMutableSet().also { it.add(className) }
+        prefs.edit { putString(key, setToJsonArray(updated)) }
+    }
+
+    /** Logs a blocked event for analytics. Lightweight — just logs to Logcat for now. */
+    fun logBlockedActivity(packageName: String, className: String) {
+        android.util.Log.d("BrowserBlock", "Blocked: $packageName / $className")
+    }
+
+    /** Registers a [SharedPreferences.OnSharedPreferenceChangeListener]. */
+    fun registerListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.registerOnSharedPreferenceChangeListener(listener)
+    }
+
+    /** Unregisters a [SharedPreferences.OnSharedPreferenceChangeListener]. */
+    fun unregisterListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {
+        prefs.unregisterOnSharedPreferenceChangeListener(listener)
+    }
+
+    private fun parseJsonStringArray(json: String): Set<String> {
+        return try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }.toSet()
+        } catch (_: Exception) {
+            emptySet()
+        }
+    }
+
+    private fun setToJsonArray(set: Set<String>): String {
+        return try {
+            org.json.JSONArray(set.toList()).toString()
+        } catch (_: Exception) {
+            "[]"
+        }
+    }
 }
