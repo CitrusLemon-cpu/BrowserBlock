@@ -24,9 +24,9 @@ import androidx.core.content.ContextCompat
  * ForegroundPollingService — persistent fallback service for UBS/accessibility-dead scenarios.
  *
  * PRIMARY ROLE:
- *   When [BlockerAccessibilityService] is alive, this service yields to it immediately
- *   ([onStartCommand] calls [stopSelf] if accessibility is enabled). The service is kept
- *   alive only as a fallback when accessibility is unavailable (e.g., during/after UBS).
+ *   When accessibility is enabled, this service yields immediately and remains on standby.
+ *   The service is kept alive only as a fallback when accessibility is unavailable
+ *   (e.g., during/after UBS).
  *
  * SECONDARY ROLE (hard-block polling mode):
  *   When accessibility is not enabled, polls [UsageStatsHelper.getForegroundPackage] every
@@ -50,7 +50,14 @@ class ForegroundPollingService : Service() {
         private const val POLL_INTERVAL_MS = 500L
 
         const val ACTION_START = "com.example.browserblock.action.START_POLLING"
+        const val ACTION_DISMISS_BLOCK = "com.example.browserblock.action.DISMISS_BLOCK_ACTIVITY"
         @Volatile var instance: ForegroundPollingService? = null
+
+        private fun dismissBlockActivity(context: Context) {
+            context.sendBroadcast(Intent(ACTION_DISMISS_BLOCK).apply {
+                setPackage(context.packageName)
+            })
+        }
 
         /** Safe to call from any context — idempotent if already running. */
         fun start(context: Context) {
@@ -94,21 +101,15 @@ class ForegroundPollingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val accessibilityAlive = BlockerAccessibilityService.instance != null
         val accessibilityEnabled = isAccessibilityServiceEnabled()
-        Log.d(
-            TAG,
-            "onStartCommand — instance=$accessibilityAlive, settingEnabled=$accessibilityEnabled"
-        )
-
-        if (accessibilityAlive && accessibilityEnabled) {
-            Log.d(TAG, "Accessibility alive and enabled — polling service on standby.")
+        Log.d(TAG, "onStartCommand — settingEnabled=$accessibilityEnabled")
+        if (accessibilityEnabled) {
+            Log.d(TAG, "Accessibility enabled — polling service on standby.")
             stopPollingLoop()
         } else {
-            Log.d(TAG, "Accessibility unavailable — entering polling mode.")
+            Log.d(TAG, "Accessibility disabled — entering polling mode.")
             startPollingLoop()
         }
-
         return START_STICKY
     }
 
@@ -144,7 +145,7 @@ class ForegroundPollingService : Service() {
                 if (isAccessibilityServiceEnabled()) {
                     Log.d(TAG, "Accessibility re-enabled — stopping polling, staying on standby.")
                     overlayManager.dismiss()
-                    BlockActivity.finishIfShowing()
+                    dismissBlockActivity(this@ForegroundPollingService)
                     getSystemService(NotificationManager::class.java)
                         ?.cancel(PowerSaveReceiver.REMINDER_NOTIFICATION_ID)
                     stopPollingLoop()
@@ -182,10 +183,9 @@ class ForegroundPollingService : Service() {
      * One tick of the polling loop.
      *
      * If a watched package is in the foreground and blocking is not paused:
-     *  - [BlockerAccessibilityService] is alive → it handles blocking via [BlockActivity];
-     *    this service does nothing (the overlay is not shown in this path).
-     *  - [BlockerAccessibilityService] is null (accessibility off) → show the hard-block
-     *    [BlockOverlayManager] overlay. No URL granularity — entire browser is blocked.
+     *  - Accessibility enabled → this service does nothing; the accessibility path handles it.
+     *  - Accessibility disabled → show the hard-block [BlockOverlayManager] overlay or launch
+     *    [BlockActivity]. No URL granularity — entire browser is blocked.
      *
      * If UsageStats permission is missing, [UsageStatsHelper.getForegroundPackage]
      * returns null and this tick is silently skipped.
@@ -194,11 +194,11 @@ class ForegroundPollingService : Service() {
         val pkg = UsageStatsHelper.getForegroundPackage(this) ?: return
 
         if (AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
-            if (BlockerAccessibilityService.instance == null) {
+            if (!isAccessibilityServiceEnabled()) {
                 if (Settings.canDrawOverlays(this)) {
                     Log.d(TAG, "Hard-block overlay: accessibility off, showing overlay for $pkg")
                     overlayManager.show()
-                } else if (BlockActivity.instance == null) {
+                } else {
                     Log.d(TAG, "No overlay permission — launching BlockActivity for $pkg")
                     startActivity(
                         Intent(this, BlockActivity::class.java).apply {
@@ -209,7 +209,7 @@ class ForegroundPollingService : Service() {
             }
         } else {
             overlayManager.dismiss()
-            if (BlockerAccessibilityService.instance == null) BlockActivity.finishIfShowing()
+            if (!isAccessibilityServiceEnabled()) dismissBlockActivity(this)
         }
     }
 
