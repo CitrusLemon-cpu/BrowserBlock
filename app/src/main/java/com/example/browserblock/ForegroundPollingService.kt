@@ -3,12 +3,14 @@ package com.example.browserblock
 import android.app.Notification
 import android.app.PendingIntent
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import androidx.core.content.ContextCompat
 
 /**
  * ForegroundPollingService — long-lived foreground service that monitors the
@@ -89,5 +91,13 @@ class ForegroundPollingService : Service() {
 
         /** Action used by [BootReceiver] and [PowerSaveReceiver] to start/restart the service. */
         const val ACTION_START = "com.example.browserblock.action.START_POLLING"
+
+        /** Starts or restarts the service. Safe to call when already running — START_STICKY is idempotent. */
+        fun start(context: Context) {
+            val intent = Intent(context, ForegroundPollingService::class.java).apply {
+                action = ACTION_START
+            }
+            ContextCompat.startForegroundService(context, intent)
+        }
     }
 }

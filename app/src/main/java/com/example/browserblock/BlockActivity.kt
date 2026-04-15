@@ -26,13 +26,28 @@ import androidx.appcompat.app.AppCompatActivity
  */
 class BlockActivity : AppCompatActivity() {
 
+    companion object {
+        @Volatile
+        var instance: BlockActivity? = null
+
+        fun finishIfShowing() {
+            instance?.runOnUiThread { instance?.finish() }
+        }
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_block)
+        instance = this
     }
 
     override fun onNewIntent(intent: android.content.Intent) {
         super.onNewIntent(intent)
         // TODO: update UI for the new blocked URL passed via intent extras
+    }
+
+    override fun onDestroy() {
+        if (instance === this) instance = null
+        super.onDestroy()
     }
 }
