@@ -94,14 +94,18 @@ class ForegroundPollingService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        val accessibilityAlive = BlockerAccessibilityService.instance != null
+        val accessibilityEnabled = isAccessibilityServiceEnabled()
         Log.d(
             TAG,
-            "onStartCommand — accessibilityInstance=${BlockerAccessibilityService.instance != null}"
+            "onStartCommand — instance=$accessibilityAlive, settingEnabled=$accessibilityEnabled"
         )
 
-        if (BlockerAccessibilityService.instance != null) {
-            Log.d(TAG, "Accessibility instance alive — polling service on standby.")
+        if (accessibilityAlive && accessibilityEnabled) {
+            Log.d(TAG, "Accessibility alive and enabled — polling service on standby.")
+            stopPollingLoop()
         } else {
+            Log.d(TAG, "Accessibility unavailable — entering polling mode.")
             startPollingLoop()
         }
 

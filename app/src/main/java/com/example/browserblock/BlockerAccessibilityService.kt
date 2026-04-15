@@ -250,6 +250,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         } catch (_: Exception) {
         }
         handler.removeCallbacks(usageStatsCheckRunnable)
+        ForegroundPollingService.start(this)
         super.onDestroy()
     }
 
