@@ -49,6 +49,7 @@ class PowerSaveReceiver : BroadcastReceiver() {
 
         // Step 1: restart ForegroundPollingService immediately.
         ForegroundPollingService.start(context)
+        ServiceRestartWorker.ensureScheduled(context)
 
         // Step 2: if accessibility was disabled by UBS, post a reminder notification.
         if (!isAccessibilityEnabled(context)) {

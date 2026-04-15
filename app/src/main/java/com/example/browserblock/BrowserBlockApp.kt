@@ -18,6 +18,7 @@ class BrowserBlockApp : Application() {
         super.onCreate()
         AppPreferences.init(this)
         createNotificationChannels()
+        ServiceRestartWorker.ensureScheduled(this)
     }
 
     // ── Notification channels ───────────────────────────────────────────────
