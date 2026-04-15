@@ -1,6 +1,7 @@
 package com.example.browserblock
 
 import android.app.Notification
+import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.ComponentName
@@ -120,6 +121,8 @@ class ForegroundPollingService : Service() {
             override fun onChange(selfChange: Boolean) {
                 if (isAccessibilityServiceEnabled()) {
                     Log.d(TAG, "Accessibility re-enabled — stopping ForegroundPollingService.")
+                    getSystemService(NotificationManager::class.java)
+                        ?.cancel(PowerSaveReceiver.REMINDER_NOTIFICATION_ID)
                     stopPollingLoop()
                     stopSelf()
                 } else {
@@ -174,8 +177,8 @@ class ForegroundPollingService : Service() {
                 startActivity(blockIntent)
             }
         } else {
-            // User left the watched app — dismiss block if showing
-            if (BlockActivity.instance != null && !AppPreferences.isWatched(pkg)) {
+            // Dismiss for any non-blocking state: user left watched app OR blocking is paused
+            if (BlockActivity.instance != null) {
                 BlockActivity.finishIfShowing()
             }
         }

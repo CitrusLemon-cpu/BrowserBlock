@@ -36,7 +36,7 @@ class PowerSaveReceiver : BroadcastReceiver() {
 
     companion object {
         private const val REMINDER_CHANNEL_ID = "browserblock_reminders"
-        private const val REMINDER_NOTIFICATION_ID = 2001
+        internal const val REMINDER_NOTIFICATION_ID = 2001
     }
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -104,7 +104,7 @@ class PowerSaveReceiver : BroadcastReceiver() {
             .setStyle(NotificationCompat.BigTextStyle()
                 .bigText(context.getString(R.string.reminder_text_expanded)))
             .setContentIntent(pi)
-            .setAutoCancel(true)
+            .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .build()
 
