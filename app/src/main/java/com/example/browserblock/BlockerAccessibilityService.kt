@@ -37,13 +37,11 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private val blockEnforceRunnable = object : Runnable {
         override fun run() {
-            if (!isBlockingActive) return
-            if (!AppPreferences.isPaused && BlockActivity.instance == null) {
-                val intent = Intent(this@BlockerAccessibilityService, BlockActivity::class.java)
-                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP) }
-                startActivity(intent)
-            }
-            handler.postDelayed(this, 1_000L)
+            if (!isBlockingActive || AppPreferences.isPaused) return
+            // Safety-net: call back again in case the browser re-opened or
+            // the first back action was not processed.
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            handler.postDelayed(this, 1_500L)
         }
     }
 
@@ -195,10 +193,15 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         if (isBrowserActivity) {
             AppPreferences.logBlockedActivity(packageName, className)
+            // Immediately navigate back to close the in-app browser.
+            // The resulting TYPE_WINDOW_STATE_CHANGED event for the returning
+            // activity will naturally clear isBlockingActive when safe.
+            performGlobalAction(GLOBAL_ACTION_BACK)
             if (!isBlockingActive) {
                 isBlockingActive = true
+                // Safety-net: fire again after 1.5s in case the first back was ignored
                 handler.removeCallbacks(blockEnforceRunnable)
-                handler.post(blockEnforceRunnable)
+                handler.postDelayed(blockEnforceRunnable, 1_500L)
             }
             handler.removeCallbacks(usageStatsCheckRunnable)
             handler.postDelayed(usageStatsCheckRunnable, 2_000L)
