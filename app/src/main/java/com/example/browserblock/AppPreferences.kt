@@ -27,6 +27,7 @@ object AppPreferences {
     private const val KEY_SETUP_COMPLETE = "setup_complete"
     private const val KEY_BLOCKING_MODE = "blocking_mode"
     private const val KEY_WATCHED_PACKAGES = "watched_packages"    // JSON array string
+    private const val KEY_EXCLUDED_PACKAGES = "excluded_packages"
     private const val KEY_BLOCKED_KEYWORDS = "blocked_keywords"    // JSON array string
     private const val KEY_ALLOWLIST_URLS = "allowlist_urls"        // JSON array string
     private const val KEY_IS_PAUSED = "is_paused"
@@ -124,8 +125,36 @@ object AppPreferences {
      */
     fun isWatched(packageName: String): Boolean {
         if (packageName in WatchedApps.NEVER_BLOCK) return false
+        if (parseJsonStringArray(prefs.getString(KEY_EXCLUDED_PACKAGES, "[]") ?: "[]").contains(packageName)) return false
         if (packageName in WatchedApps.DEFAULT_BROWSERS) return true
         return parseJsonStringArray(watchedPackagesJson).contains(packageName)
+    }
+
+    /**
+     * Sets whether [packageName] is watched.
+     *
+     * - [watched]=true, package in DEFAULT_BROWSERS → remove from exclusion list.
+     * - [watched]=false, package in DEFAULT_BROWSERS → add to exclusion list.
+     * - [watched]=true, custom package → add to [watchedPackagesJson].
+     * - [watched]=false, custom package → remove from [watchedPackagesJson].
+     */
+    fun setWatched(packageName: String, watched: Boolean) {
+        val excluded = parseJsonStringArray(
+            prefs.getString(KEY_EXCLUDED_PACKAGES, "[]") ?: "[]"
+        ).toMutableSet()
+        val custom = parseJsonStringArray(watchedPackagesJson).toMutableSet()
+
+        if (watched) {
+            excluded.remove(packageName)
+            if (packageName !in WatchedApps.DEFAULT_BROWSERS) custom.add(packageName)
+        } else {
+            if (packageName in WatchedApps.DEFAULT_BROWSERS) excluded.add(packageName)
+            custom.remove(packageName)
+        }
+        prefs.edit {
+            putString(KEY_EXCLUDED_PACKAGES, setToJsonArray(excluded))
+            putString(KEY_WATCHED_PACKAGES, setToJsonArray(custom))
+        }
     }
 
     /**

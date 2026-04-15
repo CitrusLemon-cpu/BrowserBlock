@@ -11,10 +11,10 @@
     <ImageView
         android:layout_width="64dp"
         android:layout_height="64dp"
-        android:src="@android:drawable/ic_dialog_alert"
-        android:colorFilter="#FFFFFFFF"
+        android:contentDescription="@null"
         android:layout_marginBottom="24dp"
-        android:contentDescription="@null" />
+        android:src="@android:drawable/ic_dialog_alert"
+        android:tint="#FFFFFFFF" />
 
     <TextView
         android:id="@+id/tv_overlay_title"

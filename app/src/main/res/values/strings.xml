@@ -95,6 +95,17 @@
     <string name="action_reblock">Re-block</string>
     <string name="action_curated">Curated</string>
 
+    <!-- MainActivity status card -->
+    <string name="status_title_active">Active — Accessibility on</string>
+    <string name="status_desc_active">Blocking URLs via accessibility service.</string>
+    <string name="status_title_fallback">Fallback mode — Accessibility off</string>
+    <string name="status_desc_fallback">Overlay active. Re-enable accessibility for URL-level blocking.</string>
+    <string name="status_title_paused">Paused — Blocking disabled</string>
+    <string name="status_desc_paused">Tap the switch to resume blocking.</string>
+
+    <!-- MainActivity search -->
+    <string name="search_hint">Search apps…</string>
+
     <!-- General UI -->
     <string name="button_continue">Continue</string>
     <string name="button_grant">Grant</string>
