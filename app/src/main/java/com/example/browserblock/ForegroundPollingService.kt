@@ -192,7 +192,7 @@ class ForegroundPollingService : Service() {
             }
         } else {
             overlayManager.dismiss()
-            BlockActivity.finishIfShowing()
+            if (BlockerAccessibilityService.instance == null) BlockActivity.finishIfShowing()
         }
     }
 
