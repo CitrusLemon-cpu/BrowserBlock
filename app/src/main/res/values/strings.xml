@@ -69,6 +69,11 @@
     <string name="reminder_text">Battery saver may have disabled blocking. Tap to re-enable.</string>
     <string name="reminder_text_expanded">Ultra battery saver turned off accessibility services, which disables URL-level blocking. BrowserBlock is still running in limited mode, but tap here to fully restore blocking by re-enabling the accessibility service.</string>
 
+    <!-- Hard-block overlay (accessibility-off mode) -->
+    <string name="overlay_title">BrowserBlock is disabled</string>
+    <string name="overlay_subtitle">Ultra Battery Saver turned off accessibility. Re-enable it to use this app.</string>
+    <string name="overlay_button_re_enable">Re-enable Accessibility</string>
+
     <!-- BlockActivity -->
     <string name="block_title">Site blocked</string>
     <string name="block_message">This site is on your blocked list.</string>
