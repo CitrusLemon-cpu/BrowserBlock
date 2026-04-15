@@ -101,5 +101,13 @@ object WatchedApps {
         "com.samsung.android.app.sbrowser" to setOf(
             "com.sec.android.app.sbrowser.settings.BrowserSettingsActivity",
         ),
+        "com.tencent.mm" to setOf(
+            "com.tencent.mm.ui.LauncherUI",
+            "com.tencent.mm.plugin.account.ui.WelcomeActivity",
+            "com.tencent.mm.plugin.account.ui.PhoneLoginUI",
+            "com.tencent.mm.ui.contact.AddContactUI",
+            "com.tencent.mm.ui.tools.PayUI",
+        ),
+        "com.thetileapp.tile" to emptySet(),
     )
 }
