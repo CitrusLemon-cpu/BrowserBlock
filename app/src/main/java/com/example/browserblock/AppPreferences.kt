@@ -34,6 +34,8 @@ object AppPreferences {
     private const val KEY_USER_BLOCKED_PREFIX = "user_blocked_"
     private const val KEY_UNBLOCKED_PREFIX = "unblocked_"
     private const val KEY_PKG_BLOCKING_MODE_PREFIX = "pkg_mode_"
+    private const val KEY_BLOCK_LOG_PREFIX = "block_log_"
+    private const val MAX_BLOCK_LOG_ENTRIES = 50
     private const val KEY_IS_BLOCKING_ACTIVE = "is_blocking_active"
     private const val KEY_DEVICE_ADMIN_ENABLED = "device_admin_enabled"
     private const val KEY_NOTIFICATION_LISTENER_ENABLED = "notification_listener_enabled"
@@ -162,9 +164,38 @@ object AppPreferences {
         prefs.edit { putString(key, setToJsonArray(updated)) }
     }
 
-    /** Logs a blocked event for analytics. Lightweight — just logs to Logcat for now. */
+    /** Appends [className] to the per-package block log (capped at [MAX_BLOCK_LOG_ENTRIES], most-recent-first, deduped). */
     fun logBlockedActivity(packageName: String, className: String) {
         android.util.Log.d("BrowserBlock", "Blocked: $packageName / $className")
+        val key = KEY_BLOCK_LOG_PREFIX + packageName
+        val existing = parseJsonList(prefs.getString(key, "[]") ?: "[]").toMutableList()
+        existing.remove(className)
+        existing.add(0, className)
+        if (existing.size > MAX_BLOCK_LOG_ENTRIES) existing.removeAt(existing.lastIndex)
+        prefs.edit { putString(key, org.json.JSONArray(existing).toString()) }
+    }
+
+    /** Returns recently-blocked Activity class names for [packageName], most-recent-first. */
+    fun getRecentlyBlockedActivities(packageName: String): List<String> =
+        parseJsonList(prefs.getString(KEY_BLOCK_LOG_PREFIX + packageName, "[]") ?: "[]")
+
+    /** Persists a per-package [BlockingMode] override. Falls back to [blockingMode] when read via [getBlockingMode]. */
+    fun setPackageBlockingMode(packageName: String, mode: BlockingMode) {
+        prefs.edit { putString(KEY_PKG_BLOCKING_MODE_PREFIX + packageName, mode.name) }
+    }
+
+    /** Removes [className] from the user-blocked list for [packageName]. */
+    fun removeUserBlockedActivity(packageName: String, className: String) {
+        val key = KEY_USER_BLOCKED_PREFIX + packageName
+        val updated = getUserBlockedActivities(packageName).toMutableSet().also { it.remove(className) }
+        prefs.edit { putString(key, setToJsonArray(updated)) }
+    }
+
+    /** Removes [className] from the user-allowed (unblocked) list for [packageName]. */
+    fun removeUnblockedActivity(packageName: String, className: String) {
+        val key = KEY_UNBLOCKED_PREFIX + packageName
+        val updated = getUnblockedActivities(packageName).toMutableSet().also { it.remove(className) }
+        prefs.edit { putString(key, setToJsonArray(updated)) }
     }
 
     /** Registers a [SharedPreferences.OnSharedPreferenceChangeListener]. */
@@ -183,6 +214,16 @@ object AppPreferences {
             (0 until arr.length()).map { arr.getString(it) }.toSet()
         } catch (_: Exception) {
             emptySet()
+        }
+    }
+
+    /** Like [parseJsonStringArray] but preserves insertion order as a [List]. */
+    private fun parseJsonList(json: String): List<String> {
+        return try {
+            val arr = org.json.JSONArray(json)
+            (0 until arr.length()).map { arr.getString(it) }
+        } catch (_: Exception) {
+            emptyList()
         }
     }
 

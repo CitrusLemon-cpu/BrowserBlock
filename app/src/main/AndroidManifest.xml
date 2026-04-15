@@ -63,6 +63,11 @@
             android:showOnLockScreen="true"
             android:taskAffinity="com.example.browserblock.block"
             android:theme="@style/Theme.BrowserBlock.Block" />
+        <activity
+            android:name=".AppDetailActivity"
+            android:exported="false"
+            android:label="@string/app_detail_title"
+            android:parentActivityName=".MainActivity" />
 
         <!-- ── BlockerAccessibilityService ──────────────────────── -->
         <service

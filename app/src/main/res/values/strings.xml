@@ -80,6 +80,21 @@
     <string name="block_button_go_back">Go back</string>
     <string name="block_button_open_elsewhere">Open in allowed browser</string>
 
+    <!-- AppDetailActivity -->
+    <string name="app_detail_title">App details</string>
+    <string name="app_detail_mode_label">Blocking mode</string>
+    <string name="mode_name_keyword">Keyword mode</string>
+    <string name="mode_name_allowlist">Allowlist mode</string>
+    <string name="mode_desc_keyword">Blocks browser activities whose class name matches keyword patterns. Enable debug mode to manually force-block or allow specific screens.</string>
+    <string name="mode_desc_allowlist">Blocks ALL activities except those in the allowlist below. Recommended for obfuscated apps. Enable debug mode, use the app normally, then approve each legitimate screen.</string>
+    <string name="header_recently_blocked">Recently blocked</string>
+    <string name="header_user_blocks">Force blocked (debug)</string>
+    <string name="header_allowed">Allowed activities</string>
+    <string name="action_allow">Allow</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_reblock">Re-block</string>
+    <string name="action_curated">Curated</string>
+
     <!-- General UI -->
     <string name="button_continue">Continue</string>
     <string name="button_grant">Grant</string>
