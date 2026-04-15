@@ -38,9 +38,13 @@ class BlockerAccessibilityService : AccessibilityService() {
     private val blockEnforceRunnable = object : Runnable {
         override fun run() {
             if (!isBlockingActive || AppPreferences.isPaused) return
-            // Safety-net: call back again in case the browser re-opened or
-            // the first back action was not processed.
-            performGlobalAction(GLOBAL_ACTION_BACK)
+            // Re-show the block screen if it was dismissed (e.g. system killed it).
+            // HOME was already pressed at trigger time — don't press it again here.
+            if (BlockActivity.instance == null) {
+                val intent = Intent(this@BlockerAccessibilityService, BlockActivity::class.java)
+                    .apply { addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP) }
+                startActivity(intent)
+            }
             handler.postDelayed(this, 1_500L)
         }
     }
@@ -107,8 +111,12 @@ class BlockerAccessibilityService : AccessibilityService() {
         )
 
         serviceInfo = serviceInfo?.also { info ->
-            info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED
+            info.eventTypes = AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED or
+                AccessibilityEvent.TYPE_WINDOWS_CHANGED
             info.feedbackType = AccessibilityServiceInfo.FEEDBACK_GENERIC
+            info.flags = info.flags or
+                AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS or
+                AccessibilityServiceInfo.FLAG_REPORT_VIEW_IDS
             info.notificationTimeout = 100
         }
 
@@ -142,7 +150,9 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
+        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED &&
+            event.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED
+        ) return
 
         if (AppPreferences.isPaused) {
             isBlockingActive = false
@@ -193,15 +203,17 @@ class BlockerAccessibilityService : AccessibilityService() {
 
         if (isBrowserActivity) {
             AppPreferences.logBlockedActivity(packageName, className)
-            // Immediately navigate back to close the in-app browser.
-            // The resulting TYPE_WINDOW_STATE_CHANGED event for the returning
-            // activity will naturally clear isBlockingActive when safe.
-            performGlobalAction(GLOBAL_ACTION_BACK)
             if (!isBlockingActive) {
                 isBlockingActive = true
-                // Safety-net: fire again after 1.5s in case the first back was ignored
+                // Press HOME — evicts user from browser to launcher.
+                // Block app (com.wverlaek.block) uses the same approach: performGlobalAction(2)
+                // where 2 = GLOBAL_ACTION_HOME. BACK is wrong here — BACK just navigates
+                // to the previous page in Chrome's history, keeping user in the browser.
+                performGlobalAction(GLOBAL_ACTION_HOME)
                 handler.removeCallbacks(blockEnforceRunnable)
-                handler.postDelayed(blockEnforceRunnable, 1_500L)
+                // Short delay so the HOME animation completes before BlockActivity launches.
+                // Without this, BlockActivity can open on top of the browser mid-transition.
+                handler.postDelayed(blockEnforceRunnable, 350L)
             }
             handler.removeCallbacks(usageStatsCheckRunnable)
             handler.postDelayed(usageStatsCheckRunnable, 2_000L)
