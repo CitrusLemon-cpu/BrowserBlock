@@ -13,6 +13,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.util.Log
 import androidx.core.app.NotificationCompat
@@ -64,6 +65,7 @@ class ForegroundPollingService : Service() {
     private var accessibilityObserver: ContentObserver? = null
     private var isPolling = false
     private lateinit var overlayManager: BlockOverlayManager
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // ── Polling runnable ────────────────────────────────────────────────────
 
@@ -79,6 +81,11 @@ class ForegroundPollingService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForegroundWithNotification()
+        val pm = getSystemService(PowerManager::class.java)
+        wakeLock = pm?.newWakeLock(
+            PowerManager.PARTIAL_WAKE_LOCK,
+            "BrowserBlock::ForegroundPolling"
+        )?.apply { acquire() }
         instance = this
         overlayManager = BlockOverlayManager(this)
         registerAccessibilityObserver()
@@ -109,6 +116,10 @@ class ForegroundPollingService : Service() {
             accessibilityObserver = null
         }
         if (instance === this) instance = null
+        wakeLock?.let {
+            if (it.isHeld) it.release()
+            wakeLock = null
+        }
         super.onDestroy()
     }
 
@@ -234,13 +245,13 @@ class ForegroundPollingService : Service() {
             Intent(this, MainActivity::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
-        return NotificationCompat.Builder(this, getString(R.string.notification_channel_id))
+        return NotificationCompat.Builder(this, BrowserBlockApp.MONITORING_CHANNEL_ID)
             .setSmallIcon(android.R.drawable.ic_menu_compass)
             .setContentTitle(getString(R.string.notification_title))
             .setContentText(getString(R.string.notification_text))
             .setContentIntent(openIntent)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .build()
     }
 }
