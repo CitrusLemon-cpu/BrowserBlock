@@ -77,6 +77,12 @@ class SetupActivity : AppCompatActivity() {
             tier = PermissionTier.RECOMMENDED
         )
         updateCard(
+            badge = binding.badgeBatteryOptimization,
+            button = binding.btnBatteryOptimization,
+            granted = isBatteryOptimizationExempt(),
+            tier = PermissionTier.RECOMMENDED
+        )
+        updateCard(
             badge = binding.badgePostNotif,
             button = binding.btnPostNotif,
             granted = isPostNotificationsGranted(),
@@ -140,6 +146,11 @@ class SetupActivity : AppCompatActivity() {
     }
 
     private fun isOverlayGranted(): Boolean = Settings.canDrawOverlays(this)
+
+    private fun isBatteryOptimizationExempt(): Boolean {
+        val pm = getSystemService(android.os.PowerManager::class.java) ?: return false
+        return pm.isIgnoringBatteryOptimizations(packageName)
+    }
 
     private fun isUsageStatsGranted(): Boolean {
         val appOps = getSystemService(AppOpsManager::class.java) ?: return false
@@ -218,6 +229,10 @@ class SetupActivity : AppCompatActivity() {
                 )
             }
             startActivity(intent)
+        }
+
+        binding.btnBatteryOptimization.setOnClickListener {
+            startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
         }
 
         binding.btnPostNotif.setOnClickListener {

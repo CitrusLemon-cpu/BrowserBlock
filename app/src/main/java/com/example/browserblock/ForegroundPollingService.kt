@@ -82,6 +82,7 @@ class ForegroundPollingService : Service() {
         instance = this
         overlayManager = BlockOverlayManager(this)
         registerAccessibilityObserver()
+        AlarmKeepaliveReceiver.schedule(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
