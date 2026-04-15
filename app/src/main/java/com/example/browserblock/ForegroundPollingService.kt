@@ -62,6 +62,7 @@ class ForegroundPollingService : Service() {
     private val handler = Handler(Looper.getMainLooper())
     private var accessibilityObserver: ContentObserver? = null
     private var isPolling = false
+    private lateinit var overlayManager: BlockOverlayManager
 
     // ── Polling runnable ────────────────────────────────────────────────────
 
@@ -77,6 +78,7 @@ class ForegroundPollingService : Service() {
     override fun onCreate() {
         super.onCreate()
         startForegroundWithNotification()
+        overlayManager = BlockOverlayManager(this)
         registerAccessibilityObserver()
     }
 
@@ -98,6 +100,7 @@ class ForegroundPollingService : Service() {
 
     override fun onDestroy() {
         stopPollingLoop()
+        overlayManager.dismiss()
         accessibilityObserver?.let {
             contentResolver.unregisterContentObserver(it)
             accessibilityObserver = null
@@ -121,6 +124,7 @@ class ForegroundPollingService : Service() {
             override fun onChange(selfChange: Boolean) {
                 if (isAccessibilityServiceEnabled()) {
                     Log.d(TAG, "Accessibility re-enabled — stopping ForegroundPollingService.")
+                    overlayManager.dismiss()
                     getSystemService(NotificationManager::class.java)
                         ?.cancel(PowerSaveReceiver.REMINDER_NOTIFICATION_ID)
                     stopPollingLoop()
@@ -158,29 +162,28 @@ class ForegroundPollingService : Service() {
     /**
      * One tick of the polling loop.
      *
-     * Gets the foreground package via UsageStats. If it's a watched package
-     * and blocking is not paused, launches [BlockActivity] (hard-block mode —
-     * no URL granularity available without accessibility).
+     * If a watched package is in the foreground and blocking is not paused:
+     *  - [BlockerAccessibilityService] is alive → it handles blocking via [BlockActivity];
+     *    this service does nothing (the overlay is not shown in this path).
+     *  - [BlockerAccessibilityService] is null (accessibility off) → show the hard-block
+     *    [BlockOverlayManager] overlay. No URL granularity — entire browser is blocked.
      *
      * If UsageStats permission is missing, [UsageStatsHelper.getForegroundPackage]
-     * returns null and this tick is skipped silently.
+     * returns null and this tick is silently skipped.
      */
     private fun checkForegroundApp() {
         val pkg = UsageStatsHelper.getForegroundPackage(this) ?: return
 
         if (AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
-            if (BlockActivity.instance == null) {
-                Log.d(TAG, "Hard-block: launching BlockActivity for $pkg")
-                val blockIntent = Intent(this, BlockActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                }
-                startActivity(blockIntent)
+            // Accessibility service is alive — it owns blocking via BlockActivity.
+            // Do not show the overlay here; that would double-block.
+            if (BlockerAccessibilityService.instance == null) {
+                Log.d(TAG, "Hard-block overlay: accessibility off, showing overlay for $pkg")
+                overlayManager.show()
             }
         } else {
-            // Dismiss for any non-blocking state: user left watched app OR blocking is paused
-            if (BlockActivity.instance != null) {
-                BlockActivity.finishIfShowing()
-            }
+            // User left watched app, or blocking is paused → dismiss overlay.
+            overlayManager.dismiss()
         }
     }
 
