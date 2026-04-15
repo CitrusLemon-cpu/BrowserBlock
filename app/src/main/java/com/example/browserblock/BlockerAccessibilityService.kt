@@ -162,6 +162,10 @@ class BlockerAccessibilityService : AccessibilityService() {
             (className.startsWith("android.app.") && !className.contains("Activity"))
         ) return
 
+        // Ignore events from our own package — BlockActivity appearing on screen
+        // would otherwise cancel the active blocking state.
+        if (packageName == applicationContext.packageName) return
+
         if (AppPreferences.isDebugMode && AppPreferences.isWatched(packageName)) {
             postDebugNotification(packageName, className)
         }
