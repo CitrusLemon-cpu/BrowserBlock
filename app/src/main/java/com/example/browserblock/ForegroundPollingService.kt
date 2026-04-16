@@ -187,24 +187,53 @@ class ForegroundPollingService : Service() {
      * One tick of the polling loop.
      *
      * If a watched package is in the foreground and blocking is not paused:
-     *  - [BlockerAccessibilityService] is alive → it handles blocking via [BlockActivity];
-     *    this service does nothing (the overlay is not shown in this path).
-     *  - [BlockerAccessibilityService] is null (accessibility off) → show the hard-block
-     *    [BlockOverlayManager] overlay. No URL granularity — entire browser is blocked.
+     *  - Activity class info available → apply activity-level browser detection.
+     *  - Activity class info unavailable and accessibility off → fall back to package-level blocking.
      *
-     * If UsageStats permission is missing, [UsageStatsHelper.getForegroundPackage]
-     * returns null and this tick is silently skipped.
+     * If UsageStats permission is missing, UsageStats helpers return null and this tick is skipped.
      */
     private fun checkForegroundApp() {
-        val pkg = UsageStatsHelper.getForegroundPackage(this) ?: return
+        val foregroundInfo = UsageStatsHelper.getForegroundActivity(this)
+        val pkg = foregroundInfo?.packageName
+            ?: UsageStatsHelper.getForegroundPackage(this)
+            ?: return
 
         if (AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
-            if (BlockerAccessibilityService.instance == null) {
-                forceCloseWatchedApp(pkg)
+            val fgClass = foregroundInfo?.className
+
+            if (fgClass != null) {
+                if (WatchedApps.isBrowserActivity(pkg, fgClass)) {
+                    Log.d(TAG, "Browser activity detected: $fgClass in $pkg — blocking")
+                    showBlock()
+                } else {
+                    Log.d(TAG, "Non-browser activity in watched app: $fgClass — not blocking")
+                    dismissBlock()
+                }
+            } else if (BlockerAccessibilityService.instance == null) {
+                Log.d(TAG, "No class info, accessibility off — package-level block for $pkg")
+                showBlock()
             }
         } else {
-            overlayManager.dismiss()
-            if (BlockerAccessibilityService.instance == null) BlockActivity.finishIfShowing()
+            dismissBlock()
+        }
+    }
+
+    private fun showBlock() {
+        if (Settings.canDrawOverlays(this)) {
+            overlayManager.show()
+        } else if (BlockActivity.instance == null) {
+            startActivity(
+                Intent(this, BlockActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+            )
+        }
+    }
+
+    private fun dismissBlock() {
+        overlayManager.dismiss()
+        if (BlockerAccessibilityService.instance == null) {
+            BlockActivity.finishIfShowing()
         }
     }
 

@@ -202,20 +202,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             return
         }
 
-        val mode = AppPreferences.getBlockingMode(packageName)
-        val allowedActivities =
-            (WatchedApps.curatedAllowedActivities[packageName] ?: emptySet()) +
-                AppPreferences.getUnblockedActivities(packageName)
-        val userBlocked = AppPreferences.getUserBlockedActivities(packageName)
-
-        val isBrowserActivity = when (mode) {
-            BlockingMode.KEYWORD ->
-                className in userBlocked ||
-                    (className !in allowedActivities &&
-                        WatchedApps.BROWSER_KEYWORDS.any { keyword -> className.contains(keyword) })
-            BlockingMode.ALLOWLIST ->
-                className !in allowedActivities
-        }
+        val isBrowserActivity = WatchedApps.isBrowserActivity(packageName, className)
 
         if (isBrowserActivity) {
             AppPreferences.logBlockedActivity(packageName, className)
@@ -275,20 +262,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             val foreground = UsageStatsHelper.getForegroundActivity(this)
             if (foreground != null && foreground.packageName == watchedPkg) {
                 val fgClass = foreground.className
-                val allowedActivities =
-                    (WatchedApps.curatedAllowedActivities[watchedPkg] ?: emptySet()) +
-                        AppPreferences.getUnblockedActivities(watchedPkg)
-                val userBlocked = AppPreferences.getUserBlockedActivities(watchedPkg)
-                val mode = AppPreferences.getBlockingMode(watchedPkg)
-
-                val isBrowserActivity = when (mode) {
-                    BlockingMode.KEYWORD ->
-                        fgClass in userBlocked ||
-                            (fgClass !in allowedActivities &&
-                                WatchedApps.BROWSER_KEYWORDS.any { keyword -> fgClass.contains(keyword) })
-                    BlockingMode.ALLOWLIST ->
-                        fgClass !in allowedActivities
-                }
+                val isBrowserActivity = WatchedApps.isBrowserActivity(watchedPkg, fgClass)
 
                 if (isBrowserActivity) {
                     AppPreferences.logBlockedActivity(watchedPkg, fgClass)
