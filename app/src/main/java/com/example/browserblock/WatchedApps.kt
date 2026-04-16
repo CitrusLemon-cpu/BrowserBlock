@@ -110,4 +110,25 @@ object WatchedApps {
         ),
         "com.thetileapp.tile" to emptySet(),
     )
+
+    /**
+     * Curated per-package safe domains for "Block all in-app browsing" mode.
+     * URLs whose host matches any safe domain will not be blocked.
+     */
+    val curatedSafeDomains: Map<String, Set<String>> = mapOf(
+        "com.tencent.mm" to setOf(
+            "tencent.com",
+            "qq.com",
+            "wechat.com",
+            "weixin.qq.com",
+            "wx.qq.com",
+            "qpic.cn",
+            "myqcloud.com",
+            "gtimg.cn",
+            "qlogo.cn",
+            "idqqimg.com",
+            "wxpay.wxutil.com",
+            "servicewechat.com",
+        ),
+    )
 }

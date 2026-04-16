@@ -94,6 +94,11 @@
     <string name="action_remove">Remove</string>
     <string name="action_reblock">Re-block</string>
     <string name="action_curated">Curated</string>
+    <string name="block_all_inapp_title">Block all in-app web browsing</string>
+    <string name="block_all_inapp_desc">Block all websites opened through this app\'s in-app browser. Only the app\'s own domains are allowed through.</string>
+    <string name="safe_domains_header">Safe domains</string>
+    <string name="safe_domains_desc">These domains are allowed when in-app browsing is blocked. The app\'s own domains are pre-configured.</string>
+    <string name="safe_domains_hint">e.g. example.com</string>
 
     <!-- MainActivity status card -->
     <string name="status_title_active">Active — Accessibility on</string>

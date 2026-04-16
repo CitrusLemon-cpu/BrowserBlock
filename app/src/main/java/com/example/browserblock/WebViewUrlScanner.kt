@@ -23,11 +23,23 @@ object WebViewUrlScanner {
         val keyword: String,
     )
 
-    fun extractUrls(root: AccessibilityNodeInfo?): Set<String> {
-        root ?: return emptySet()
+    data class ScanResult(
+        val urls: Set<String>,
+        val webViewDetected: Boolean,
+    )
+
+    fun scan(root: AccessibilityNodeInfo?): ScanResult {
+        root ?: return ScanResult(emptySet(), false)
         val urls = mutableSetOf<String>()
-        scanNode(root, urls, insideWebView = false, depth = 0)
-        return urls
+        var webViewFound = false
+        scanNodeImpl(root, urls, insideWebView = false, depth = 0) {
+            webViewFound = true
+        }
+        return ScanResult(urls, webViewFound)
+    }
+
+    fun extractUrls(root: AccessibilityNodeInfo?): Set<String> {
+        return scan(root).urls
     }
 
     fun matchesBlockedKeyword(urls: Set<String>, blockedKeywords: Set<String>): Boolean {
@@ -50,11 +62,39 @@ object WebViewUrlScanner {
         return null
     }
 
-    private fun scanNode(
+    fun isUrlSafe(url: String, safeDomains: Set<String>): Boolean {
+        val host = extractHost(url) ?: return false
+        val lowerHost = host.lowercase()
+        return safeDomains.any { domain ->
+            val lowerDomain = domain.lowercase()
+            lowerHost == lowerDomain || lowerHost.endsWith(".$lowerDomain")
+        }
+    }
+
+    private fun extractHost(url: String): String? {
+        val withScheme = if (url.startsWith("http://") || url.startsWith("https://")) {
+            url
+        } else {
+            "https://$url"
+        }
+        return try {
+            java.net.URI(withScheme).host
+        } catch (_: Exception) {
+            val trimmed = url.trim()
+            if (trimmed.contains(".") && !trimmed.contains(" ") && !trimmed.contains("/")) {
+                trimmed
+            } else {
+                null
+            }
+        }
+    }
+
+    private fun scanNodeImpl(
         node: AccessibilityNodeInfo,
         urls: MutableSet<String>,
         insideWebView: Boolean,
         depth: Int,
+        onWebViewFound: () -> Unit,
     ) {
         if (depth > MAX_SCAN_DEPTH) return
 
@@ -64,10 +104,9 @@ object WebViewUrlScanner {
         }
         val effectivelyInsideWebView = insideWebView || isWebView
 
-        if (effectivelyInsideWebView) {
-            node.text?.toString()?.let { extractUrlsFromText(it, urls) }
-            node.contentDescription?.toString()?.let { extractUrlsFromText(it, urls) }
-        }
+        node.text?.toString()?.let { extractUrlsFromText(it, urls) }
+        node.contentDescription?.toString()?.let { extractUrlsFromText(it, urls) }
+        if (isWebView) onWebViewFound()
 
         val viewId = node.viewIdResourceName.orEmpty()
         if (viewId.contains("url", ignoreCase = true) ||
@@ -81,7 +120,7 @@ object WebViewUrlScanner {
         for (index in 0 until node.childCount) {
             val child = node.getChild(index) ?: continue
             try {
-                scanNode(child, urls, effectivelyInsideWebView, depth + 1)
+                scanNodeImpl(child, urls, effectivelyInsideWebView, depth + 1, onWebViewFound)
             } finally {
                 child.recycle()
             }
