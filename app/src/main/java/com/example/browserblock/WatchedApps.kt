@@ -131,4 +131,21 @@ object WatchedApps {
             "servicewechat.com",
         ),
     )
+
+    fun isBrowserActivity(packageName: String, className: String): Boolean {
+        val allowedActivities =
+            (curatedAllowedActivities[packageName] ?: emptySet()) +
+                AppPreferences.getUnblockedActivities(packageName)
+        val userBlocked = AppPreferences.getUserBlockedActivities(packageName)
+        val mode = AppPreferences.getBlockingMode(packageName)
+
+        return when (mode) {
+            BlockingMode.KEYWORD ->
+                className in userBlocked ||
+                    (className !in allowedActivities &&
+                        BROWSER_KEYWORDS.any { keyword -> className.contains(keyword) })
+            BlockingMode.ALLOWLIST ->
+                className !in allowedActivities
+        }
+    }
 }
