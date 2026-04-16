@@ -274,14 +274,16 @@ class BlockerAccessibilityService : AccessibilityService() {
             }
 
             val result = WebViewUrlScanner.scan(root)
-            if (!result.webViewDetected || result.urls.isEmpty()) return
+            if (result.urls.isEmpty()) return
 
             val pkg = watchedPackage ?: root.packageName?.toString().orEmpty()
+            val blockAllInApp = AppPreferences.isInAppBrowsingBlocked(pkg)
+            if (!blockAllInApp && !result.webViewDetected) return
             val shouldBlock: Boolean
             var debugMatchUrl = ""
             var debugMatchKeyword = ""
 
-            if (AppPreferences.isInAppBrowsingBlocked(pkg)) {
+            if (blockAllInApp) {
                 val safeDomains = AppPreferences.getAllSafeDomains(pkg)
                 val unsafeUrl = result.urls.firstOrNull { url ->
                     !WebViewUrlScanner.isUrlSafe(url, safeDomains)
