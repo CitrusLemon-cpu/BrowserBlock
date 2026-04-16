@@ -49,9 +49,8 @@ object AppPreferences {
 
     /** Must be called once from [BrowserBlockApp.onCreate] before any component reads prefs. */
     fun init(context: Context) {
-        @Suppress("DEPRECATION")
         prefs = context.applicationContext
-            .getSharedPreferences(PREFS_NAME, Context.MODE_MULTI_PROCESS)
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
     }
 
     // ── Properties ──────────────────────────────────────────────────────────
