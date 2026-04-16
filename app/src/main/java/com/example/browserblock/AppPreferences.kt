@@ -104,6 +104,27 @@ object AppPreferences {
         get() = prefs.getString(KEY_BLOCKED_KEYWORDS, "[]") ?: "[]"
         set(value) = prefs.edit { putString(KEY_BLOCKED_KEYWORDS, value) }
 
+    /** Parsed set of blocked domain or keyword strings for URL matching. */
+    fun getBlockedKeywords(): Set<String> = parseJsonStringArray(blockedKeywordsJson)
+
+    /** Adds [keyword] to the blocked keywords list. */
+    fun addBlockedKeyword(keyword: String) {
+        val normalized = keyword.trim().lowercase()
+        if (normalized.isEmpty()) return
+        val current = getBlockedKeywords().toMutableSet()
+        current.add(normalized)
+        blockedKeywordsJson = setToJsonArray(current)
+    }
+
+    /** Removes [keyword] from the blocked keywords list. */
+    fun removeBlockedKeyword(keyword: String) {
+        val normalized = keyword.trim().lowercase()
+        if (normalized.isEmpty()) return
+        val current = getBlockedKeywords().toMutableSet()
+        current.remove(normalized)
+        blockedKeywordsJson = setToJsonArray(current)
+    }
+
     /** JSON array of allowed URL patterns (used in [BlockingMode.ALLOWLIST]). */
     var allowlistUrlsJson: String
         get() = prefs.getString(KEY_ALLOWLIST_URLS, "[]") ?: "[]"
