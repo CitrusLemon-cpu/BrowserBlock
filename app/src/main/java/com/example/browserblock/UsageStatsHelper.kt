@@ -5,6 +5,8 @@ import android.app.usage.UsageStatsManager
 import android.content.Context
 import android.os.Build
 
+data class ForegroundActivity(val packageName: String, val className: String)
+
 /**
  * UsageStatsHelper — object for querying foreground app information.
  *
@@ -39,6 +41,39 @@ object UsageStatsHelper {
             getForegroundPackageViaEvents(usm)
         } else {
             getForegroundPackageViaStats(usm)
+        }
+    }
+
+    /**
+     * Returns the package name and Activity class name of the current foreground Activity,
+     * or null if PACKAGE_USAGE_STATS has not been granted or the query fails.
+     *
+     * Uses ACTIVITY_RESUMED events on API 29+ and MOVE_TO_FOREGROUND on API 21-28.
+     */
+    fun getForegroundActivity(context: Context): ForegroundActivity? {
+        val usm = context.getSystemService(UsageStatsManager::class.java) ?: return null
+        val now = System.currentTimeMillis()
+        val events = usm.queryEvents(now - QUERY_WINDOW_MS, now) ?: return null
+        var lastPackage: String? = null
+        var lastClass: String? = null
+        val event = UsageEvents.Event()
+        val targetType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            UsageEvents.Event.ACTIVITY_RESUMED
+        } else {
+            @Suppress("DEPRECATION")
+            UsageEvents.Event.MOVE_TO_FOREGROUND
+        }
+        while (events.hasNextEvent()) {
+            events.getNextEvent(event)
+            if (event.eventType == targetType) {
+                lastPackage = event.packageName
+                lastClass = event.className
+            }
+        }
+        return if (lastPackage != null && lastClass != null) {
+            ForegroundActivity(lastPackage, lastClass)
+        } else {
+            null
         }
     }
 
