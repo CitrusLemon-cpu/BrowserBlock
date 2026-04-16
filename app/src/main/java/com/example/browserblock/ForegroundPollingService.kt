@@ -22,22 +22,22 @@ import androidx.core.app.ServiceCompat
 import androidx.core.content.ContextCompat
 
 /**
- * ForegroundPollingService — persistent fallback service for UBS/accessibility-dead scenarios.
+ * ForegroundPollingService — persistent monitoring service with cooperative polling.
  *
- * PRIMARY ROLE:
- *   When [BlockerAccessibilityService] is alive, this service yields to it immediately
- *   ([onStartCommand] calls [stopSelf] if accessibility is enabled). The service is kept
- *   alive only as a fallback when accessibility is unavailable (e.g., during/after UBS).
+ * COOPERATIVE ROLE:
+ *   When [BlockerAccessibilityService] is alive, this service keeps polling
+ *   [UsageStatsHelper.getForegroundActivity] every [POLL_INTERVAL_MS] ms and delegates
+ *   browser blocks to [BlockerAccessibilityService.triggerExternalBlock] when it detects
+ *   browser Activities that accessibility events missed.
  *
- * SECONDARY ROLE (hard-block polling mode):
- *   When accessibility is not enabled, polls [UsageStatsHelper.getForegroundPackage] every
- *   [POLL_INTERVAL_MS] ms. If a watched package is in the foreground and the user is not
- *   paused, launches [BlockActivity] directly. This is coarser than the accessibility path
- *   (no URL-level granularity — whole browser is blocked), but keeps coverage alive.
+ * HARD-BLOCK ROLE:
+ *   When accessibility is not enabled, this same polling loop owns blocking directly via
+ *   overlay/[BlockActivity]. This is coarser than the accessibility path (no URL-level
+ *   granularity — whole browser is blocked), but keeps coverage alive.
  *
  * HANDOFF LOGIC (ContentObserver on ENABLED_ACCESSIBILITY_SERVICES):
- *   - Accessibility enabled  → [stopSelf]; accessibility service takes over cleanly.
- *   - Accessibility disabled → [startPollingLoop]; remain alive in hard-block mode.
+ *   - Accessibility enabled  → dismiss overlay/reminders and remain in cooperative mode.
+ *   - Accessibility disabled → remain in hard-block polling mode.
  *
  * PERMISSION DEGRADATION:
  *   If PACKAGE_USAGE_STATS is not granted, [UsageStatsHelper.getForegroundPackage] returns
@@ -102,13 +102,7 @@ class ForegroundPollingService : Service() {
             "onStartCommand — instance=$accessibilityAlive, settingEnabled=$accessibilityEnabled"
         )
 
-        if (accessibilityAlive && accessibilityEnabled) {
-            Log.d(TAG, "Accessibility alive and enabled — polling service on standby.")
-            stopPollingLoop()
-        } else {
-            Log.d(TAG, "Accessibility unavailable — entering polling mode.")
-            startPollingLoop()
-        }
+        startPollingLoop()
 
         return START_STICKY
     }
@@ -136,19 +130,17 @@ class ForegroundPollingService : Service() {
      * Registers a ContentObserver on [Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES].
      *
      * Fires whenever the user or system changes which accessibility services are enabled:
-     *  - If our service is now in the list → hand off and stop self.
-     *  - If our service is no longer in the list (UBS just killed it) → start polling.
+     *  - If our service is now in the list → hand off overlay state and keep cooperative polling.
+     *  - If our service is no longer in the list (UBS just killed it) → keep polling in hard-block mode.
      */
     private fun registerAccessibilityObserver() {
         val observer = object : ContentObserver(Handler(Looper.getMainLooper())) {
             override fun onChange(selfChange: Boolean) {
                 if (isAccessibilityServiceEnabled()) {
-                    Log.d(TAG, "Accessibility re-enabled — stopping polling, staying on standby.")
+                    Log.d(TAG, "Accessibility re-enabled — switching to cooperative polling mode.")
                     overlayManager.dismiss()
-                    BlockActivity.finishIfShowing()
                     getSystemService(NotificationManager::class.java)
                         ?.cancel(PowerSaveReceiver.REMINDER_NOTIFICATION_ID)
-                    stopPollingLoop()
                 } else {
                     Log.d(TAG, "Accessibility disabled — entering hard-block polling mode.")
                     startPollingLoop()
@@ -198,23 +190,33 @@ class ForegroundPollingService : Service() {
             ?: UsageStatsHelper.getForegroundPackage(this)
             ?: return
 
+        val accessibilityAlive = BlockerAccessibilityService.instance != null
+
         if (AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
             val fgClass = foregroundInfo?.className
 
             if (fgClass != null) {
                 if (WatchedApps.isBrowserActivity(pkg, fgClass)) {
                     Log.d(TAG, "Browser activity detected: $fgClass in $pkg — blocking")
-                    showBlock()
+                    if (accessibilityAlive) {
+                        BlockerAccessibilityService.instance?.triggerExternalBlock(pkg, fgClass)
+                    } else {
+                        showBlock()
+                    }
                 } else {
-                    Log.d(TAG, "Non-browser activity in watched app: $fgClass — not blocking")
-                    dismissBlock()
+                    if (!accessibilityAlive) {
+                        Log.d(TAG, "Non-browser activity in watched app: $fgClass — not blocking")
+                        dismissBlock()
+                    }
                 }
-            } else if (BlockerAccessibilityService.instance == null) {
+            } else if (!accessibilityAlive) {
                 Log.d(TAG, "No class info, accessibility off — package-level block for $pkg")
                 showBlock()
             }
         } else {
-            dismissBlock()
+            if (!accessibilityAlive) {
+                dismissBlock()
+            }
         }
     }
 

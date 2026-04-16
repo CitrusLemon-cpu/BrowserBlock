@@ -30,10 +30,13 @@ class BrowserBlockApp : Application() {
         // Block's (com.wverlaek.block) behavior of restarting its FGS from
         // Application.onCreate().
         //
-        // The service handles accessibility handoff internally: if
-        // BlockerAccessibilityService is alive and enabled, ForegroundPollingService
-        // enters standby mode (stops polling) but remains running to maintain the
-        // foreground notification and START_STICKY restart guarantee.
+        // The service runs its 500ms activity polling loop at all times:
+        // - When accessibility is alive: cooperative mode — polls getForegroundActivity()
+        //   and triggers blocking via BlockerAccessibilityService.triggerExternalBlock()
+        //   when it detects browser Activities that accessibility events missed
+        //   (e.g., WeChat reusing MMWebViewUI on repeated opens).
+        // - When accessibility is dead (UBS, force-stop): owns blocking directly
+        //   via overlay/BlockActivity, the only detection path available.
         //
         // Guard: only start if the user has completed setup. Before setup,
         // required permissions (PACKAGE_USAGE_STATS, notification channel) may
