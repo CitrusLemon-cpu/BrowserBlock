@@ -256,6 +256,34 @@ class BlockerAccessibilityService : AccessibilityService() {
         super.onDestroy()
     }
 
+    /**
+     * Called by [ForegroundPollingService] when its 500ms UsageStats polling detects
+     * a browser Activity that this service missed because no TYPE_WINDOW_STATE_CHANGED
+     * event fired (e.g., WeChat reusing MMWebViewUI on repeated opens).
+     *
+     * Triggers the same blocking flow as [onAccessibilityEvent]: HOME → BlockActivity → enforce loop.
+     * No-op if already blocking or paused.
+     */
+    fun triggerExternalBlock(packageName: String, className: String) {
+        if (isBlockingActive) return
+        if (AppPreferences.isPaused) return
+
+        AppPreferences.logBlockedActivity(packageName, className)
+        isBlockingActive = true
+        blockingTriggeredAt = System.currentTimeMillis()
+        performGlobalAction(GLOBAL_ACTION_HOME)
+        handler.removeCallbacks(blockEnforceRunnable)
+        handler.postDelayed(blockEnforceRunnable, 350L)
+        handler.removeCallbacks(usageStatsCheckRunnable)
+        handler.postDelayed(usageStatsCheckRunnable, 2_000L)
+
+        if (AppPreferences.isDebugMode) {
+            postScanDiagnosticNotification(
+                "Polling detected browser: $className\npkg=$packageName — BLOCKING (external trigger)"
+            )
+        }
+    }
+
     private fun performUrlScan() {
         val watchedPkg = currentWatchedPackage
         if (watchedPkg != null && !isBlockingActive) {
