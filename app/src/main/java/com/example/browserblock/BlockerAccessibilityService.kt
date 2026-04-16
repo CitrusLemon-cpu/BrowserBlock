@@ -194,9 +194,11 @@ class BlockerAccessibilityService : AccessibilityService() {
                 val elapsed = System.currentTimeMillis() - blockingTriggeredAt
                 if (elapsed > BLOCKING_GRACE_MS) {
                     clearBlockingState()
+                    stopUrlScanning()
                 }
+            } else {
+                stopUrlScanning()
             }
-            stopUrlScanning()
             return
         }
 
@@ -216,7 +218,6 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
 
         if (isBrowserActivity) {
-            stopUrlScanning()
             AppPreferences.logBlockedActivity(packageName, className)
             if (!isBlockingActive) {
                 isBlockingActive = true
