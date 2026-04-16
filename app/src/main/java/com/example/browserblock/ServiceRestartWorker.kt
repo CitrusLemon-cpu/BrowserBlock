@@ -40,10 +40,8 @@ class ServiceRestartWorker(
 
     override fun doWork(): Result {
         Log.d(TAG, "WorkManager fired — checking service.")
-        if (ForegroundPollingService.instance == null &&
-            BlockerAccessibilityService.instance == null
-        ) {
-            Log.d(TAG, "Service dead — restarting via WorkManager.")
+        if (ForegroundPollingService.instance == null) {
+            Log.d(TAG, "ForegroundPollingService dead — restarting via WorkManager.")
             ForegroundPollingService.start(applicationContext)
         }
         AlarmKeepaliveReceiver.schedule(applicationContext)

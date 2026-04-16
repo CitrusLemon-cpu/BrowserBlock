@@ -22,6 +22,29 @@ class BrowserBlockApp : Application() {
         super.onCreate()
         AppPreferences.init(this)
         createNotificationChannels()
+
+        // Start ForegroundPollingService immediately on every process creation.
+        // This is critical for LockScreenClean recovery: when MIUI force-stops
+        // the app and Android restarts the process for NotificationListenerService,
+        // this ensures our foreground service is back up within seconds — matching
+        // Block's (com.wverlaek.block) behavior of restarting its FGS from
+        // Application.onCreate().
+        //
+        // The service handles accessibility handoff internally: if
+        // BlockerAccessibilityService is alive and enabled, ForegroundPollingService
+        // enters standby mode (stops polling) but remains running to maintain the
+        // foreground notification and START_STICKY restart guarantee.
+        //
+        // Guard: only start if the user has completed setup. Before setup,
+        // required permissions (PACKAGE_USAGE_STATS, notification channel) may
+        // not be granted yet, and starting the service would show a notification
+        // before the user expects it.
+        if (AppPreferences.isSetupComplete) {
+            ForegroundPollingService.start(this)
+        }
+
+        // WorkManager remains as a secondary keepalive for edge cases where
+        // the process is cold-started without a system-bound service trigger.
         ServiceRestartWorker.ensureScheduled(this)
     }
 
