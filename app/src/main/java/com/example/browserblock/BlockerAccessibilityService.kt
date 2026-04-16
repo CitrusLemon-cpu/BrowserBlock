@@ -93,13 +93,6 @@ class BlockerAccessibilityService : AccessibilityService() {
     private val urlScanRunnable = object : Runnable {
         override fun run() {
             if (!isUrlScanningActive || AppPreferences.isPaused) return
-            val pkg = currentWatchedPackage
-            val hasKeywords = AppPreferences.getBlockedKeywords().isNotEmpty()
-            val blockAllInApp = pkg != null && AppPreferences.isInAppBrowsingBlocked(pkg)
-            if (!hasKeywords && !blockAllInApp) {
-                stopUrlScanning()
-                return
-            }
             performUrlScan()
             if (isUrlScanningActive && !AppPreferences.isPaused) {
                 handler.postDelayed(this, 2_000L)
@@ -276,6 +269,52 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun performUrlScan() {
+        val watchedPkg = currentWatchedPackage
+        if (watchedPkg != null && !isBlockingActive) {
+            val foreground = UsageStatsHelper.getForegroundActivity(this)
+            if (foreground != null && foreground.packageName == watchedPkg) {
+                val fgClass = foreground.className
+                val allowedActivities =
+                    (WatchedApps.curatedAllowedActivities[watchedPkg] ?: emptySet()) +
+                        AppPreferences.getUnblockedActivities(watchedPkg)
+                val userBlocked = AppPreferences.getUserBlockedActivities(watchedPkg)
+                val mode = AppPreferences.getBlockingMode(watchedPkg)
+
+                val isBrowserActivity = when (mode) {
+                    BlockingMode.KEYWORD ->
+                        fgClass in userBlocked ||
+                            (fgClass !in allowedActivities &&
+                                WatchedApps.BROWSER_KEYWORDS.any { keyword -> fgClass.contains(keyword) })
+                    BlockingMode.ALLOWLIST ->
+                        fgClass !in allowedActivities
+                }
+
+                if (isBrowserActivity) {
+                    AppPreferences.logBlockedActivity(watchedPkg, fgClass)
+                    isBlockingActive = true
+                    blockingTriggeredAt = System.currentTimeMillis()
+                    performGlobalAction(GLOBAL_ACTION_HOME)
+                    handler.removeCallbacks(blockEnforceRunnable)
+                    handler.postDelayed(blockEnforceRunnable, 350L)
+                    handler.removeCallbacks(usageStatsCheckRunnable)
+                    handler.postDelayed(usageStatsCheckRunnable, 2_000L)
+
+                    if (AppPreferences.isDebugMode) {
+                        postScanDiagnosticNotification(
+                            "UsageStats detected browser: $fgClass\npkg=$watchedPkg — BLOCKING"
+                        )
+                    }
+                    return
+                }
+            }
+        }
+
+        val hasKeywords = AppPreferences.getBlockedKeywords().isNotEmpty()
+        val blockAllInApp = watchedPkg != null && AppPreferences.isInAppBrowsingBlocked(watchedPkg)
+        if (!hasKeywords && !blockAllInApp) {
+            return
+        }
+
         val root = rootInActiveWindow
         if (root == null) {
             if (AppPreferences.isDebugMode) {
@@ -384,20 +423,13 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun startUrlScanning(packageName: String, className: String) {
-        val hasKeywords = AppPreferences.getBlockedKeywords().isNotEmpty()
-        val blockAllInApp = AppPreferences.isInAppBrowsingBlocked(packageName)
-        if (!hasKeywords && !blockAllInApp) {
-            if (AppPreferences.isDebugMode) {
-                postScanDiagnosticNotification("Scan NOT started for $packageName: no keywords and blockAll=false")
-            }
-            stopUrlScanning()
-            return
-        }
         currentWatchedPackage = packageName
         currentWatchedClassName = className
         if (isUrlScanningActive) return
         isUrlScanningActive = true
         if (AppPreferences.isDebugMode) {
+            val hasKeywords = AppPreferences.getBlockedKeywords().isNotEmpty()
+            val blockAllInApp = AppPreferences.isInAppBrowsingBlocked(packageName)
             postScanDiagnosticNotification("Scan STARTED for $packageName ($className)\nblockAll=$blockAllInApp, hasKeywords=$hasKeywords")
         }
         handler.removeCallbacks(urlScanRunnable)
