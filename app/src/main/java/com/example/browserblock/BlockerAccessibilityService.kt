@@ -197,7 +197,12 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
 
         if (!AppPreferences.isWatched(packageName)) {
-            clearBlockingState()
+            if (isBlockingActive) {
+                val elapsed = System.currentTimeMillis() - blockingTriggeredAt
+                if (elapsed > BLOCKING_GRACE_MS) {
+                    clearBlockingState()
+                }
+            }
             stopUrlScanning()
             return
         }
