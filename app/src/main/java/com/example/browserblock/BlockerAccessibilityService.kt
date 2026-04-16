@@ -265,20 +265,61 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun performUrlScan() {
-        val root = rootInActiveWindow ?: return
+        val root = rootInActiveWindow
+        if (root == null) {
+            if (AppPreferences.isDebugMode) {
+                postScanDiagnosticNotification("rootInActiveWindow is NULL — no accessibility tree available")
+            }
+            return
+        }
         try {
             val watchedPackage = currentWatchedPackage
             if (watchedPackage != null && root.packageName?.toString() != watchedPackage) {
+                if (AppPreferences.isDebugMode) {
+                    postScanDiagnosticNotification(
+                        "Package mismatch: expected=$watchedPackage, got=${root.packageName} — stopping scan"
+                    )
+                }
                 stopUrlScanning()
                 return
             }
 
             val result = WebViewUrlScanner.scan(root)
-            if (result.urls.isEmpty()) return
-
             val pkg = watchedPackage ?: root.packageName?.toString().orEmpty()
             val blockAllInApp = AppPreferences.isInAppBrowsingBlocked(pkg)
+
+            if (AppPreferences.isDebugMode) {
+                val urlList = result.urls.take(10).joinToString("\n") { "  • $it" }
+                val safeDomains = if (blockAllInApp) AppPreferences.getAllSafeDomains(pkg) else emptySet()
+                val unsafeUrls = if (blockAllInApp) {
+                    result.urls.filter { !WebViewUrlScanner.isUrlSafe(it, safeDomains) }
+                } else {
+                    emptySet()
+                }
+                val diag = buildString {
+                    appendLine("pkg=$pkg")
+                    appendLine("blockAllInApp=$blockAllInApp")
+                    appendLine("webViewDetected=${result.webViewDetected}")
+                    appendLine("urlCount=${result.urls.size}")
+                    if (result.urls.isNotEmpty()) {
+                        appendLine("urls (first 10):")
+                        append(urlList)
+                    }
+                    if (blockAllInApp && unsafeUrls.isNotEmpty()) {
+                        appendLine()
+                        appendLine("unsafeUrls=${unsafeUrls.take(5)}")
+                    }
+                    if (blockAllInApp && unsafeUrls.isEmpty() && result.urls.isNotEmpty()) {
+                        appendLine()
+                        appendLine("ALL urls matched safe domains — no block")
+                    }
+                }
+                postScanDiagnosticNotification(diag)
+            }
+
+            if (result.urls.isEmpty()) return
             if (!blockAllInApp && !result.webViewDetected) return
+
             val shouldBlock: Boolean
             var debugMatchUrl = ""
             var debugMatchKeyword = ""
@@ -334,6 +375,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         val hasKeywords = AppPreferences.getBlockedKeywords().isNotEmpty()
         val blockAllInApp = AppPreferences.isInAppBrowsingBlocked(packageName)
         if (!hasKeywords && !blockAllInApp) {
+            if (AppPreferences.isDebugMode) {
+                postScanDiagnosticNotification("Scan NOT started for $packageName: no keywords and blockAll=false")
+            }
             stopUrlScanning()
             return
         }
@@ -341,6 +385,9 @@ class BlockerAccessibilityService : AccessibilityService() {
         currentWatchedClassName = className
         if (isUrlScanningActive) return
         isUrlScanningActive = true
+        if (AppPreferences.isDebugMode) {
+            postScanDiagnosticNotification("Scan STARTED for $packageName ($className)\nblockAll=$blockAllInApp, hasKeywords=$hasKeywords")
+        }
         handler.removeCallbacks(urlScanRunnable)
         handler.postDelayed(urlScanRunnable, 500L)
     }
@@ -399,6 +446,19 @@ class BlockerAccessibilityService : AccessibilityService() {
             .addAction(0, "Allow this", allowPi)
             .build()
         getSystemService(NotificationManager::class.java).notify(className.hashCode(), notification)
+    }
+
+    private fun postScanDiagnosticNotification(message: String) {
+        val notification = NotificationCompat.Builder(this, DEBUG_NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("URL Scan Diagnostic")
+            .setContentText(message.take(100))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(message))
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .build()
+        getSystemService(NotificationManager::class.java)
+            .notify("url_scan_diagnostic".hashCode(), notification)
     }
 
     private fun postUrlScanDebugNotification(
