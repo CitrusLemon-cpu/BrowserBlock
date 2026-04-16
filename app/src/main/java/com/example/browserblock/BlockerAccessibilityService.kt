@@ -33,6 +33,9 @@ class BlockerAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
 
     private var isBlockingActive = false
+    private var isUrlScanningActive = false
+    private var currentWatchedPackage: String? = null
+    private var currentWatchedClassName: String? = null
     private var accessibilitySettingsObserver: ContentObserver? = null
 
     private val blockEnforceRunnable = object : Runnable {
@@ -51,10 +54,8 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
         if (AppPreferences.isPaused) {
-            isBlockingActive = false
-            handler.removeCallbacks(blockEnforceRunnable)
-            BlockActivity.finishIfShowing()
-            handler.removeCallbacks(usageStatsCheckRunnable)
+            clearBlockingState()
+            stopUrlScanning()
         }
     }
 
@@ -82,6 +83,20 @@ class BlockerAccessibilityService : AccessibilityService() {
                 BlockActivity.finishIfShowing()
                 handler.removeCallbacks(this)
             } else {
+                handler.postDelayed(this, 2_000L)
+            }
+        }
+    }
+
+    private val urlScanRunnable = object : Runnable {
+        override fun run() {
+            if (!isUrlScanningActive || AppPreferences.isPaused) return
+            if (AppPreferences.getBlockedKeywords().isEmpty()) {
+                stopUrlScanning()
+                return
+            }
+            performUrlScan()
+            if (isUrlScanningActive && !AppPreferences.isPaused) {
                 handler.postDelayed(this, 2_000L)
             }
         }
@@ -155,10 +170,8 @@ class BlockerAccessibilityService : AccessibilityService() {
         ) return
 
         if (AppPreferences.isPaused) {
-            isBlockingActive = false
-            handler.removeCallbacks(blockEnforceRunnable)
-            BlockActivity.finishIfShowing()
-            handler.removeCallbacks(usageStatsCheckRunnable)
+            clearBlockingState()
+            stopUrlScanning()
             return
         }
 
@@ -179,10 +192,8 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
 
         if (!AppPreferences.isWatched(packageName)) {
-            isBlockingActive = false
-            handler.removeCallbacks(blockEnforceRunnable)
-            BlockActivity.finishIfShowing()
-            handler.removeCallbacks(usageStatsCheckRunnable)
+            clearBlockingState()
+            stopUrlScanning()
             return
         }
 
@@ -202,6 +213,7 @@ class BlockerAccessibilityService : AccessibilityService() {
         }
 
         if (isBrowserActivity) {
+            stopUrlScanning()
             AppPreferences.logBlockedActivity(packageName, className)
             if (!isBlockingActive) {
                 isBlockingActive = true
@@ -219,27 +231,23 @@ class BlockerAccessibilityService : AccessibilityService() {
             handler.postDelayed(usageStatsCheckRunnable, 2_000L)
         } else {
             if (isBlockingActive) {
-                isBlockingActive = false
-                handler.removeCallbacks(blockEnforceRunnable)
-                BlockActivity.finishIfShowing()
+                clearBlockingState()
             }
             handler.removeCallbacks(usageStatsCheckRunnable)
+            startUrlScanning(packageName, className)
         }
     }
 
     override fun onInterrupt() {
-        isBlockingActive = false
-        handler.removeCallbacks(blockEnforceRunnable)
-        BlockActivity.finishIfShowing()
-        handler.removeCallbacks(usageStatsCheckRunnable)
+        clearBlockingState()
+        stopUrlScanning()
         ForegroundPollingService.start(this)
     }
 
     override fun onDestroy() {
         instance = null
-        isBlockingActive = false
-        handler.removeCallbacks(blockEnforceRunnable)
-        BlockActivity.finishIfShowing()
+        clearBlockingState()
+        stopUrlScanning()
         AppPreferences.unregisterListener(preferenceListener)
         accessibilitySettingsObserver?.let {
             contentResolver.unregisterContentObserver(it)
@@ -249,9 +257,71 @@ class BlockerAccessibilityService : AccessibilityService() {
             unregisterReceiver(debugActionReceiver)
         } catch (_: Exception) {
         }
-        handler.removeCallbacks(usageStatsCheckRunnable)
         ForegroundPollingService.start(this)
         super.onDestroy()
+    }
+
+    private fun performUrlScan() {
+        val root = rootInActiveWindow ?: return
+        try {
+            val watchedPackage = currentWatchedPackage
+            if (watchedPackage != null && root.packageName?.toString() != watchedPackage) {
+                stopUrlScanning()
+                return
+            }
+
+            val urls = WebViewUrlScanner.extractUrls(root)
+            val match = WebViewUrlScanner.findBlockedMatch(urls, AppPreferences.getBlockedKeywords()) ?: return
+
+            if (AppPreferences.isDebugMode) {
+                postUrlScanDebugNotification(
+                    packageName = watchedPackage ?: root.packageName?.toString().orEmpty(),
+                    className = currentWatchedClassName ?: root.className?.toString().orEmpty(),
+                    matchedUrl = match.url,
+                    matchedKeyword = match.keyword
+                )
+            }
+
+            if (!isBlockingActive) {
+                isBlockingActive = true
+                stopUrlScanning()
+                performGlobalAction(GLOBAL_ACTION_HOME)
+                handler.removeCallbacks(blockEnforceRunnable)
+                handler.postDelayed(blockEnforceRunnable, 350L)
+            }
+            handler.removeCallbacks(usageStatsCheckRunnable)
+            handler.postDelayed(usageStatsCheckRunnable, 2_000L)
+        } finally {
+            root.recycle()
+        }
+    }
+
+    private fun startUrlScanning(packageName: String, className: String) {
+        val blockedKeywords = AppPreferences.getBlockedKeywords()
+        if (blockedKeywords.isEmpty()) {
+            stopUrlScanning()
+            return
+        }
+        currentWatchedPackage = packageName
+        currentWatchedClassName = className
+        if (isUrlScanningActive) return
+        isUrlScanningActive = true
+        handler.removeCallbacks(urlScanRunnable)
+        handler.postDelayed(urlScanRunnable, 500L)
+    }
+
+    private fun stopUrlScanning() {
+        isUrlScanningActive = false
+        currentWatchedPackage = null
+        currentWatchedClassName = null
+        handler.removeCallbacks(urlScanRunnable)
+    }
+
+    private fun clearBlockingState() {
+        isBlockingActive = false
+        handler.removeCallbacks(blockEnforceRunnable)
+        BlockActivity.finishIfShowing()
+        handler.removeCallbacks(usageStatsCheckRunnable)
     }
 
     private fun postDebugNotification(packageName: String, className: String) {
@@ -294,5 +364,29 @@ class BlockerAccessibilityService : AccessibilityService() {
             .addAction(0, "Allow this", allowPi)
             .build()
         getSystemService(NotificationManager::class.java).notify(className.hashCode(), notification)
+    }
+
+    private fun postUrlScanDebugNotification(
+        packageName: String,
+        className: String,
+        matchedUrl: String,
+        matchedKeyword: String,
+    ) {
+        val packageShortName = packageName.substringAfterLast('.', packageName)
+        val classShortName = when {
+            className.startsWith("$packageName.") -> className.removePrefix("$packageName.")
+            className.isNotEmpty() -> className.substringAfterLast('.')
+            else -> "Unknown"
+        }
+        val notification = NotificationCompat.Builder(this, DEBUG_NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("[$packageShortName] URL blocked in $classShortName")
+            .setContentText("\"$matchedKeyword\" matched $matchedUrl")
+            .setSubText(packageName)
+            .setSmallIcon(android.R.drawable.ic_dialog_info)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setAutoCancel(true)
+            .build()
+        getSystemService(NotificationManager::class.java)
+            .notify((packageName + matchedKeyword + matchedUrl).hashCode(), notification)
     }
 }

@@ -8,9 +8,12 @@ import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
+import android.view.View
+import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
 import com.example.browserblock.databinding.ActivitySettingsBinding
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
@@ -27,11 +30,13 @@ class SettingsActivity : AppCompatActivity() {
         setupResetButton()
         setupPermissionButtons()
         setupTroubleshootingButtons()
+        setupBlockedSitesSection()
     }
 
     override fun onResume() {
         super.onResume()
         refreshAllBadges()
+        refreshBlockedSites()
     }
 
     private fun refreshAllBadges() {
@@ -232,6 +237,38 @@ class SettingsActivity : AppCompatActivity() {
         binding.switchDebugMode.isChecked = AppPreferences.isDebugMode
         binding.switchDebugMode.setOnCheckedChangeListener { _, isChecked ->
             AppPreferences.isDebugMode = isChecked
+        }
+    }
+
+    private fun setupBlockedSitesSection() {
+        binding.btnAddBlockedKeyword.setOnClickListener {
+            val keyword = binding.etBlockedKeyword.text?.toString().orEmpty().trim()
+            if (keyword.isEmpty()) return@setOnClickListener
+            AppPreferences.addBlockedKeyword(keyword)
+            binding.etBlockedKeyword.text?.clear()
+            refreshBlockedSites()
+        }
+    }
+
+    private fun refreshBlockedSites() {
+        val keywords = AppPreferences.getBlockedKeywords().sorted()
+        binding.tvBlockedSitesEmpty.visibility = if (keywords.isEmpty()) View.VISIBLE else View.GONE
+        renderKeywordRows(binding.containerBlockedSites, keywords)
+    }
+
+    private fun renderKeywordRows(container: LinearLayout, keywords: List<String>) {
+        container.removeAllViews()
+        keywords.forEach { keyword ->
+            val row = layoutInflater.inflate(R.layout.item_activity_entry, container, false)
+            row.findViewById<TextView>(R.id.tv_class_name).text = keyword
+            row.findViewById<MaterialButton>(R.id.btn_action).apply {
+                text = getString(R.string.action_remove)
+                setOnClickListener {
+                    AppPreferences.removeBlockedKeyword(keyword)
+                    refreshBlockedSites()
+                }
+            }
+            container.addView(row)
         }
     }
 

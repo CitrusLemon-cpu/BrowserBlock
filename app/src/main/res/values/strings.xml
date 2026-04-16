@@ -109,6 +109,7 @@
     <!-- Settings screen section headers -->
     <string name="settings_section_permissions">Permissions</string>
     <string name="settings_section_troubleshooting">Troubleshooting</string>
+    <string name="settings_section_blocked_sites">Blocked sites</string>
     <string name="settings_section_debug">Debug</string>
     <string name="settings_section_service">Service status</string>
     <string name="settings_section_danger">Danger zone</string>
@@ -116,11 +117,15 @@
     <!-- Settings screen labels -->
     <string name="settings_debug_label">Debug mode</string>
     <string name="settings_debug_warning">Posts a notification for every screen transition in watched apps. Turn off when done building your allowlist.</string>
+    <string name="settings_blocked_sites_desc">Block these sites when opened in any watched app\'s in-app browser (e.g. WeChat, Telegram). Enter domain keywords like "youtube" or "reddit".</string>
+    <string name="settings_blocked_sites_hint">e.g. youtube, reddit, twitter</string>
+    <string name="settings_blocked_sites_empty">No blocked sites configured. Add keywords above to block sites in in-app browsers.</string>
     <string name="settings_service_accessibility">Accessibility service</string>
     <string name="settings_service_polling">Fallback polling service</string>
 
     <!-- Settings screen buttons -->
     <string name="settings_btn_fix">Fix</string>
+    <string name="settings_btn_add">Add</string>
     <string name="settings_btn_reset">Reset all settings</string>
 
     <!-- Settings — Troubleshooting section -->
