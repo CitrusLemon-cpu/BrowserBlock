@@ -1,5 +1,6 @@
 package com.example.browserblock
 
+import android.app.ActivityManager
 import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -151,6 +152,10 @@ class ForegroundPollingService : Service() {
                 } else {
                     Log.d(TAG, "Accessibility disabled — entering hard-block polling mode.")
                     startPollingLoop()
+                    val pkg = UsageStatsHelper.getForegroundPackage(this@ForegroundPollingService)
+                    if (pkg != null && AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
+                        forceCloseWatchedApp(pkg)
+                    }
                 }
             }
         }
@@ -195,22 +200,35 @@ class ForegroundPollingService : Service() {
 
         if (AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
             if (BlockerAccessibilityService.instance == null) {
-                if (Settings.canDrawOverlays(this)) {
-                    Log.d(TAG, "Hard-block overlay: accessibility off, showing overlay for $pkg")
-                    overlayManager.show()
-                } else if (BlockActivity.instance == null) {
-                    Log.d(TAG, "No overlay permission — launching BlockActivity for $pkg")
-                    startActivity(
-                        Intent(this, BlockActivity::class.java).apply {
-                            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                        }
-                    )
-                }
+                forceCloseWatchedApp(pkg)
             }
         } else {
             overlayManager.dismiss()
             if (BlockerAccessibilityService.instance == null) BlockActivity.finishIfShowing()
         }
+    }
+
+    private fun forceCloseWatchedApp(pkg: String) {
+        startActivity(
+            Intent(Intent.ACTION_MAIN).apply {
+                addCategory(Intent.CATEGORY_HOME)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            }
+        )
+
+        if (Settings.canDrawOverlays(this)) {
+            Log.d(TAG, "Hard-block overlay: accessibility off, forcing close for $pkg")
+            overlayManager.show()
+        } else if (BlockActivity.instance == null) {
+            Log.d(TAG, "No overlay permission — launching BlockActivity for $pkg")
+            startActivity(
+                Intent(this, BlockActivity::class.java).apply {
+                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                }
+            )
+        }
+
+        getSystemService(ActivityManager::class.java)?.killBackgroundProcesses(pkg)
     }
 
     private fun isAccessibilityServiceEnabled(): Boolean {
