@@ -91,7 +91,10 @@ class BlockerAccessibilityService : AccessibilityService() {
     private val urlScanRunnable = object : Runnable {
         override fun run() {
             if (!isUrlScanningActive || AppPreferences.isPaused) return
-            if (AppPreferences.getBlockedKeywords().isEmpty()) {
+            val pkg = currentWatchedPackage
+            val hasKeywords = AppPreferences.getBlockedKeywords().isNotEmpty()
+            val blockAllInApp = pkg != null && AppPreferences.isInAppBrowsingBlocked(pkg)
+            if (!hasKeywords && !blockAllInApp) {
                 stopUrlScanning()
                 return
             }
@@ -270,15 +273,44 @@ class BlockerAccessibilityService : AccessibilityService() {
                 return
             }
 
-            val urls = WebViewUrlScanner.extractUrls(root)
-            val match = WebViewUrlScanner.findBlockedMatch(urls, AppPreferences.getBlockedKeywords()) ?: return
+            val result = WebViewUrlScanner.scan(root)
+            if (!result.webViewDetected || result.urls.isEmpty()) return
+
+            val pkg = watchedPackage ?: root.packageName?.toString().orEmpty()
+            val shouldBlock: Boolean
+            var debugMatchUrl = ""
+            var debugMatchKeyword = ""
+
+            if (AppPreferences.isInAppBrowsingBlocked(pkg)) {
+                val safeDomains = AppPreferences.getAllSafeDomains(pkg)
+                val unsafeUrl = result.urls.firstOrNull { url ->
+                    !WebViewUrlScanner.isUrlSafe(url, safeDomains)
+                }
+                shouldBlock = unsafeUrl != null
+                if (unsafeUrl != null) {
+                    debugMatchUrl = unsafeUrl
+                    debugMatchKeyword = "[all-blocked]"
+                }
+            } else {
+                val match = WebViewUrlScanner.findBlockedMatch(
+                    result.urls,
+                    AppPreferences.getBlockedKeywords()
+                )
+                shouldBlock = match != null
+                if (match != null) {
+                    debugMatchUrl = match.url
+                    debugMatchKeyword = match.keyword
+                }
+            }
+
+            if (!shouldBlock) return
 
             if (AppPreferences.isDebugMode) {
                 postUrlScanDebugNotification(
-                    packageName = watchedPackage ?: root.packageName?.toString().orEmpty(),
+                    packageName = pkg,
                     className = currentWatchedClassName ?: root.className?.toString().orEmpty(),
-                    matchedUrl = match.url,
-                    matchedKeyword = match.keyword
+                    matchedUrl = debugMatchUrl,
+                    matchedKeyword = debugMatchKeyword
                 )
             }
 
@@ -297,8 +329,9 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private fun startUrlScanning(packageName: String, className: String) {
-        val blockedKeywords = AppPreferences.getBlockedKeywords()
-        if (blockedKeywords.isEmpty()) {
+        val hasKeywords = AppPreferences.getBlockedKeywords().isNotEmpty()
+        val blockAllInApp = AppPreferences.isInAppBrowsingBlocked(packageName)
+        if (!hasKeywords && !blockAllInApp) {
             stopUrlScanning()
             return
         }

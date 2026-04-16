@@ -36,6 +36,8 @@ object AppPreferences {
     private const val KEY_UNBLOCKED_PREFIX = "unblocked_"
     private const val KEY_PKG_BLOCKING_MODE_PREFIX = "pkg_mode_"
     private const val KEY_BLOCK_LOG_PREFIX = "block_log_"
+    private const val KEY_BLOCK_ALL_INAPP_PREFIX = "block_all_inapp_"
+    private const val KEY_SAFE_DOMAINS_PREFIX = "safe_domains_"
     private const val MAX_BLOCK_LOG_ENTRIES = 50
     private const val KEY_IS_BLOCKING_ACTIVE = "is_blocking_active"
     private const val KEY_DEVICE_ADMIN_ENABLED = "device_admin_enabled"
@@ -247,6 +249,37 @@ object AppPreferences {
         val updated = getUnblockedActivities(packageName).toMutableSet().also { it.remove(className) }
         prefs.edit { putString(key, setToJsonArray(updated)) }
     }
+
+    /** Whether "Block all in-app browsing" is enabled for [packageName]. */
+    fun isInAppBrowsingBlocked(packageName: String): Boolean =
+        prefs.getBoolean(KEY_BLOCK_ALL_INAPP_PREFIX + packageName, false)
+
+    fun setInAppBrowsingBlocked(packageName: String, blocked: Boolean) =
+        prefs.edit { putBoolean(KEY_BLOCK_ALL_INAPP_PREFIX + packageName, blocked) }
+
+    /** User-configured safe domains for [packageName] (merged with curated). */
+    fun getUserSafeDomains(packageName: String): Set<String> =
+        parseJsonStringArray(prefs.getString(KEY_SAFE_DOMAINS_PREFIX + packageName, "[]") ?: "[]")
+
+    fun addUserSafeDomain(packageName: String, domain: String) {
+        val normalized = domain.trim().lowercase()
+        if (normalized.isEmpty()) return
+        val current = getUserSafeDomains(packageName).toMutableSet()
+        current.add(normalized)
+        prefs.edit { putString(KEY_SAFE_DOMAINS_PREFIX + packageName, setToJsonArray(current)) }
+    }
+
+    fun removeUserSafeDomain(packageName: String, domain: String) {
+        val normalized = domain.trim().lowercase()
+        if (normalized.isEmpty()) return
+        val current = getUserSafeDomains(packageName).toMutableSet()
+        current.remove(normalized)
+        prefs.edit { putString(KEY_SAFE_DOMAINS_PREFIX + packageName, setToJsonArray(current)) }
+    }
+
+    /** Returns all safe domains for [packageName]: curated + user-configured. */
+    fun getAllSafeDomains(packageName: String): Set<String> =
+        (WatchedApps.curatedSafeDomains[packageName] ?: emptySet()) + getUserSafeDomains(packageName)
 
     /** Registers a [SharedPreferences.OnSharedPreferenceChangeListener]. */
     fun registerListener(listener: SharedPreferences.OnSharedPreferenceChangeListener) {

@@ -46,6 +46,8 @@ class AppDetailActivity : AppCompatActivity() {
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
         setupModeSwitch()
+        setupInAppBrowsingToggle()
+        setupSafeDomainsSection()
     }
 
     override fun onResume() {
@@ -83,9 +85,52 @@ class AppDetailActivity : AppCompatActivity() {
     }
 
     private fun refreshAllSections() {
+        refreshSafeDomains()
         refreshRecentlyBlocked()
         refreshUserForcedBlocks()
         refreshAllowedActivities()
+    }
+
+    private fun setupInAppBrowsingToggle() {
+        binding.switchBlockAllInapp.isChecked = AppPreferences.isInAppBrowsingBlocked(targetPackageName)
+        binding.switchBlockAllInapp.setOnCheckedChangeListener { _, isChecked ->
+            AppPreferences.setInAppBrowsingBlocked(targetPackageName, isChecked)
+            refreshSafeDomains()
+        }
+    }
+
+    private fun setupSafeDomainsSection() {
+        binding.btnAddSafeDomain.setOnClickListener {
+            val domain = binding.etSafeDomain.text?.toString().orEmpty().trim()
+            if (domain.isEmpty()) return@setOnClickListener
+            AppPreferences.addUserSafeDomain(targetPackageName, domain)
+            binding.etSafeDomain.text?.clear()
+            refreshSafeDomains()
+        }
+    }
+
+    private fun refreshSafeDomains() {
+        val blockAllEnabled = AppPreferences.isInAppBrowsingBlocked(targetPackageName)
+        binding.containerSafeDomains.visibility = if (blockAllEnabled) View.VISIBLE else View.GONE
+        if (!blockAllEnabled) return
+
+        val container = binding.containerSafeDomainsList
+        container.removeAllViews()
+
+        val curated = (WatchedApps.curatedSafeDomains[targetPackageName] ?: emptySet()).sorted()
+        val userDomains = AppPreferences.getUserSafeDomains(targetPackageName)
+            .filter { it !in curated.toSet() }
+            .sorted()
+
+        curated.forEach { domain ->
+            addRow(container, domain, getString(R.string.action_curated), clickable = false)
+        }
+        userDomains.forEach { domain ->
+            addRow(container, domain, getString(R.string.action_remove)) {
+                AppPreferences.removeUserSafeDomain(targetPackageName, domain)
+                refreshSafeDomains()
+            }
+        }
     }
 
     private fun refreshRecentlyBlocked() {
