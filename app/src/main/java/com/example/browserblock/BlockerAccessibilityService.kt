@@ -22,6 +22,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     companion object {
         private const val DEBUG_NOTIFICATION_CHANNEL_ID = "browserblock_debug"
+        private const val BLOCKING_GRACE_MS = 1_000L
         const val ACTION_DEBUG_BLOCK = "com.example.browserblock.DEBUG_BLOCK"
         const val ACTION_DEBUG_ALLOW = "com.example.browserblock.DEBUG_ALLOW"
         const val EXTRA_PACKAGE = "extra_package"
@@ -33,6 +34,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     private val handler = Handler(Looper.getMainLooper())
 
     private var isBlockingActive = false
+    private var blockingTriggeredAt = 0L
     private var isUrlScanningActive = false
     private var currentWatchedPackage: String? = null
     private var currentWatchedClassName: String? = null
@@ -220,6 +222,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             AppPreferences.logBlockedActivity(packageName, className)
             if (!isBlockingActive) {
                 isBlockingActive = true
+                blockingTriggeredAt = System.currentTimeMillis()
                 // Press HOME — evicts user from browser to launcher.
                 // Block app (com.wverlaek.block) uses the same approach: performGlobalAction(2)
                 // where 2 = GLOBAL_ACTION_HOME. BACK is wrong here — BACK just navigates
@@ -234,7 +237,10 @@ class BlockerAccessibilityService : AccessibilityService() {
             handler.postDelayed(usageStatsCheckRunnable, 2_000L)
         } else {
             if (isBlockingActive) {
-                clearBlockingState()
+                val elapsed = System.currentTimeMillis() - blockingTriggeredAt
+                if (elapsed > BLOCKING_GRACE_MS) {
+                    clearBlockingState()
+                }
             }
             handler.removeCallbacks(usageStatsCheckRunnable)
             startUrlScanning(packageName, className)
@@ -359,6 +365,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
             if (!isBlockingActive) {
                 isBlockingActive = true
+                blockingTriggeredAt = System.currentTimeMillis()
                 stopUrlScanning()
                 performGlobalAction(GLOBAL_ACTION_HOME)
                 handler.removeCallbacks(blockEnforceRunnable)
@@ -401,6 +408,7 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private fun clearBlockingState() {
         isBlockingActive = false
+        blockingTriggeredAt = 0L
         handler.removeCallbacks(blockEnforceRunnable)
         BlockActivity.finishIfShowing()
         handler.removeCallbacks(usageStatsCheckRunnable)
