@@ -3,6 +3,7 @@ package com.example.browserblock
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import java.util.Calendar
 
 /**
  * AppPreferences — singleton SharedPreferences wrapper.
@@ -38,6 +39,8 @@ object AppPreferences {
     private const val KEY_BLOCK_LOG_PREFIX = "block_log_"
     private const val KEY_BLOCK_ALL_INAPP_PREFIX = "block_all_inapp_"
     private const val KEY_SAFE_DOMAINS_PREFIX = "safe_domains_"
+    private const val KEY_SCHEDULE_ENABLED = "schedule_enabled"
+    private const val KEY_SCHEDULE_ENTRIES = "schedule_entries"
     private const val MAX_BLOCK_LOG_ENTRIES = 50
     private const val KEY_IS_BLOCKING_ACTIVE = "is_blocking_active"
     private const val KEY_DEVICE_ADMIN_ENABLED = "device_admin_enabled"
@@ -141,6 +144,43 @@ object AppPreferences {
     var isDebugMode: Boolean
         get() = prefs.getBoolean(KEY_IS_DEBUG_MODE, false)
         set(value) = prefs.edit { putBoolean(KEY_IS_DEBUG_MODE, value) }
+
+    var isScheduleEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SCHEDULE_ENABLED, false)
+        set(value) = prefs.edit { putBoolean(KEY_SCHEDULE_ENABLED, value) }
+
+    var scheduleEntriesJson: String
+        get() = prefs.getString(KEY_SCHEDULE_ENTRIES, "[]") ?: "[]"
+        set(value) = prefs.edit { putString(KEY_SCHEDULE_ENTRIES, value) }
+
+    fun getScheduleEntries(): List<ScheduleEntry> = ScheduleEntry.listFromJson(scheduleEntriesJson)
+
+    fun setScheduleEntries(entries: List<ScheduleEntry>) {
+        scheduleEntriesJson = ScheduleEntry.listToJson(entries)
+    }
+
+    fun addScheduleEntry(entry: ScheduleEntry) {
+        val current = getScheduleEntries().toMutableList()
+        current.add(entry)
+        setScheduleEntries(current)
+    }
+
+    fun removeScheduleEntry(id: String) {
+        val current = getScheduleEntries().toMutableList()
+        current.removeAll { it.id == id }
+        setScheduleEntries(current)
+    }
+
+    fun shouldBlock(): Boolean {
+        if (isPaused) return false
+        if (!isScheduleEnabled) return true
+        val entries = getScheduleEntries()
+        if (entries.isEmpty()) return false
+        val now = Calendar.getInstance()
+        val dayOfWeek = now.get(Calendar.DAY_OF_WEEK)
+        val minutesFromMidnight = now.get(Calendar.HOUR_OF_DAY) * 60 + now.get(Calendar.MINUTE)
+        return entries.any { it.coversTime(dayOfWeek, minutesFromMidnight) }
+    }
 
     /**
      * Returns true if [packageName] is currently being monitored.

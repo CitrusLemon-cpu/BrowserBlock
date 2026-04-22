@@ -145,7 +145,29 @@
     <string name="settings_badge_optional">Optional</string>
 
     <!-- Overflow menu -->
+    <string name="menu_schedule">Schedule</string>
     <string name="menu_settings">Settings</string>
+
+    <!-- Schedule -->
+    <string name="schedule_title">Schedule</string>
+    <string name="schedule_card_title">Block on a weekly schedule</string>
+    <string name="schedule_card_subtitle">Select time to activate</string>
+    <string name="schedule_add_time">Add time</string>
+    <string name="schedule_dialog_title">Set time to block apps</string>
+    <string name="schedule_dialog_days_label">Blocked on days</string>
+    <string name="schedule_dialog_from">From</string>
+    <string name="schedule_dialog_until">Until</string>
+    <string name="schedule_dialog_cancel">Cancel</string>
+    <string name="schedule_dialog_add">Add</string>
+    <string name="schedule_day_sun">SUN</string>
+    <string name="schedule_day_mon">MON</string>
+    <string name="schedule_day_tue">TUE</string>
+    <string name="schedule_day_wed">WED</string>
+    <string name="schedule_day_thu">THU</string>
+    <string name="schedule_day_fri">FRI</string>
+    <string name="schedule_day_sat">SAT</string>
+    <string name="status_title_scheduled_inactive">Scheduled — Not active now</string>
+    <string name="status_desc_scheduled_inactive">Blocking will activate at the next scheduled time.</string>
 
     <!-- Reset confirmation dialog -->
     <string name="settings_reset_title">Reset all settings?</string>

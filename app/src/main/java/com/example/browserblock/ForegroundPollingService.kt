@@ -145,7 +145,7 @@ class ForegroundPollingService : Service() {
                     Log.d(TAG, "Accessibility disabled — entering hard-block polling mode.")
                     startPollingLoop()
                     val pkg = UsageStatsHelper.getForegroundPackage(this@ForegroundPollingService)
-                    if (pkg != null && AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
+                    if (pkg != null && AppPreferences.isWatched(pkg) && AppPreferences.shouldBlock()) {
                         forceCloseWatchedApp(pkg)
                     }
                 }
@@ -192,7 +192,7 @@ class ForegroundPollingService : Service() {
 
         val accessibilityAlive = BlockerAccessibilityService.instance != null
 
-        if (AppPreferences.isWatched(pkg) && !AppPreferences.isPaused) {
+        if (AppPreferences.isWatched(pkg) && AppPreferences.shouldBlock()) {
             val fgClass = foregroundInfo?.className
 
             if (fgClass != null) {
