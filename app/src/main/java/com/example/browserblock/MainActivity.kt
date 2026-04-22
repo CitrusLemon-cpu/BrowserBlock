@@ -104,9 +104,15 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.action_settings) {
-            startActivity(Intent(this, SettingsActivity::class.java))
-            return true
+        when (item.itemId) {
+            R.id.action_schedule -> {
+                startActivity(Intent(this, ScheduleActivity::class.java))
+                return true
+            }
+            R.id.action_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java))
+                return true
+            }
         }
         return super.onOptionsItemSelected(item)
     }
@@ -114,12 +120,19 @@ class MainActivity : AppCompatActivity() {
     private fun refreshStatusCard() {
         val isPaused = AppPreferences.isPaused
         val accessibilityOn = BlockerAccessibilityService.instance != null
+        val scheduledButInactive =
+            AppPreferences.isScheduleEnabled && !AppPreferences.shouldBlock() && !isPaused
 
         val (titleRes, descRes, colorRes) = when {
             isPaused -> Triple(
                 R.string.status_title_paused,
                 R.string.status_desc_paused,
                 R.color.status_red
+            )
+            scheduledButInactive -> Triple(
+                R.string.status_title_scheduled_inactive,
+                R.string.status_desc_scheduled_inactive,
+                R.color.status_yellow
             )
             accessibilityOn -> Triple(
                 R.string.status_title_active,

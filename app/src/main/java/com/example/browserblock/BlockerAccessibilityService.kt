@@ -42,7 +42,12 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private val blockEnforceRunnable = object : Runnable {
         override fun run() {
-            if (!isBlockingActive || AppPreferences.isPaused) return
+            if (!isBlockingActive) return
+            if (!AppPreferences.shouldBlock()) {
+                clearBlockingState()
+                stopUrlScanning()
+                return
+            }
             // Re-show the block screen if it was dismissed (e.g. system killed it).
             // HOME was already pressed at trigger time — don't press it again here.
             if (BlockActivity.instance == null) {
@@ -55,7 +60,7 @@ class BlockerAccessibilityService : AccessibilityService() {
     }
 
     private val preferenceListener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ ->
-        if (AppPreferences.isPaused) {
+        if (!AppPreferences.shouldBlock()) {
             clearBlockingState()
             stopUrlScanning()
         }
@@ -92,9 +97,14 @@ class BlockerAccessibilityService : AccessibilityService() {
 
     private val urlScanRunnable = object : Runnable {
         override fun run() {
-            if (!isUrlScanningActive || AppPreferences.isPaused) return
+            if (!isUrlScanningActive) return
+            if (!AppPreferences.shouldBlock()) {
+                clearBlockingState()
+                stopUrlScanning()
+                return
+            }
             performUrlScan()
-            if (isUrlScanningActive && !AppPreferences.isPaused) {
+            if (isUrlScanningActive && AppPreferences.shouldBlock()) {
                 handler.postDelayed(this, 2_000L)
             }
         }
@@ -167,7 +177,7 @@ class BlockerAccessibilityService : AccessibilityService() {
             event.eventType != AccessibilityEvent.TYPE_WINDOWS_CHANGED
         ) return
 
-        if (AppPreferences.isPaused) {
+        if (!AppPreferences.shouldBlock()) {
             clearBlockingState()
             stopUrlScanning()
             return
@@ -266,7 +276,7 @@ class BlockerAccessibilityService : AccessibilityService() {
      */
     fun triggerExternalBlock(packageName: String, className: String) {
         if (isBlockingActive) return
-        if (AppPreferences.isPaused) return
+        if (!AppPreferences.shouldBlock()) return
 
         AppPreferences.logBlockedActivity(packageName, className)
         isBlockingActive = true
