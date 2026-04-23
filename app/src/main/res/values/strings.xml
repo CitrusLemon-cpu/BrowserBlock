@@ -107,6 +107,15 @@
     <string name="status_desc_fallback">Overlay active. Re-enable accessibility for URL-level blocking.</string>
     <string name="status_title_paused">Paused — Blocking disabled</string>
     <string name="status_desc_paused">Tap the switch to resume blocking.</string>
+    <string name="pause_dialog_title">Pause for how long?</string>
+    <string name="pause_duration_5min">5 minutes</string>
+    <string name="pause_duration_15min">15 minutes</string>
+    <string name="pause_duration_30min">30 minutes</string>
+    <string name="pause_duration_1hour">1 hour</string>
+    <string name="pause_duration_2hours">2 hours</string>
+    <string name="pause_duration_indefinite">Until I turn it back on</string>
+    <string name="pause_dialog_cancel">Cancel</string>
+    <string name="status_desc_paused_timed">Resumes in %1$s</string>
 
     <!-- MainActivity search -->
     <string name="search_hint">Search apps…</string>

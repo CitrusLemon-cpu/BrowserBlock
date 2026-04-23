@@ -32,6 +32,7 @@ object AppPreferences {
     private const val KEY_BLOCKED_KEYWORDS = "blocked_keywords"    // JSON array string
     private const val KEY_ALLOWLIST_URLS = "allowlist_urls"        // JSON array string
     private const val KEY_IS_PAUSED = "is_paused"
+    private const val KEY_PAUSE_END_TIME = "pause_end_time"
     private const val KEY_IS_DEBUG_MODE = "is_debug_mode"
     private const val KEY_USER_BLOCKED_PREFIX = "user_blocked_"
     private const val KEY_UNBLOCKED_PREFIX = "unblocked_"
@@ -137,8 +138,54 @@ object AppPreferences {
 
     /** Whether blocking is temporarily paused by the user. */
     var isPaused: Boolean
-        get() = prefs.getBoolean(KEY_IS_PAUSED, false)
+        get() {
+            val paused = prefs.getBoolean(KEY_IS_PAUSED, false)
+            if (paused) {
+                val endTime = prefs.getLong(KEY_PAUSE_END_TIME, 0L)
+                if (endTime > 0L && System.currentTimeMillis() >= endTime) {
+                    prefs.edit {
+                        putBoolean(KEY_IS_PAUSED, false)
+                        putLong(KEY_PAUSE_END_TIME, 0L)
+                    }
+                    return false
+                }
+            }
+            return paused
+        }
         set(value) = prefs.edit { putBoolean(KEY_IS_PAUSED, value) }
+
+    var pauseEndTime: Long
+        get() = prefs.getLong(KEY_PAUSE_END_TIME, 0L)
+        set(value) = prefs.edit { putLong(KEY_PAUSE_END_TIME, value) }
+
+    fun startTimedPause(durationMs: Long) {
+        prefs.edit {
+            putLong(KEY_PAUSE_END_TIME, System.currentTimeMillis() + durationMs)
+            putBoolean(KEY_IS_PAUSED, true)
+        }
+    }
+
+    fun startIndefinitePause() {
+        prefs.edit {
+            putLong(KEY_PAUSE_END_TIME, 0L)
+            putBoolean(KEY_IS_PAUSED, true)
+        }
+    }
+
+    fun clearPause() {
+        prefs.edit {
+            putBoolean(KEY_IS_PAUSED, false)
+            putLong(KEY_PAUSE_END_TIME, 0L)
+        }
+    }
+
+    fun getPauseRemainingMs(): Long {
+        if (!prefs.getBoolean(KEY_IS_PAUSED, false)) return 0L
+        val endTime = prefs.getLong(KEY_PAUSE_END_TIME, 0L)
+        if (endTime <= 0L) return Long.MAX_VALUE
+        val remaining = endTime - System.currentTimeMillis()
+        return if (remaining > 0) remaining else 0L
+    }
 
     /** Whether debug mode is active (shows notification for every watched-app Activity). */
     var isDebugMode: Boolean
