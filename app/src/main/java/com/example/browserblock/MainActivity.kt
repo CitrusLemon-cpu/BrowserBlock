@@ -4,6 +4,8 @@ import android.content.Intent
 import android.content.pm.ResolveInfo
 import android.graphics.drawable.Drawable
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
 import android.view.LayoutInflater
@@ -17,6 +19,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.example.browserblock.databinding.ActivityMainBinding
 import com.example.browserblock.databinding.ItemWatchedAppBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -71,6 +74,22 @@ class MainActivity : AppCompatActivity() {
     private lateinit var binding: ActivityMainBinding
     private val adapter = WatchedAppAdapter()
     private var allApps: List<AppItem> = emptyList()
+    private val countdownHandler = Handler(Looper.getMainLooper())
+    private val countdownRunnable = object : Runnable {
+        override fun run() {
+            val isPaused = AppPreferences.isPaused
+            val remaining = AppPreferences.getPauseRemainingMs()
+            if (isPaused && remaining > 0 && remaining != Long.MAX_VALUE) {
+                refreshStatusCard()
+                countdownHandler.postDelayed(this, 1_000L)
+            } else if (!isPaused && binding.switchPause.isChecked.not()) {
+                binding.switchPause.setOnCheckedChangeListener(null)
+                binding.switchPause.isChecked = true
+                setupPauseSwitch()
+                refreshStatusCard()
+            }
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -89,13 +108,24 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         ForegroundPollingService.start(this)
+        binding.switchPause.setOnCheckedChangeListener(null)
         binding.switchPause.isChecked = !AppPreferences.isPaused
+        setupPauseSwitch()
         refreshStatusCard()
+        val remaining = AppPreferences.getPauseRemainingMs()
+        if (remaining > 0 && remaining != Long.MAX_VALUE) {
+            startCountdownTimer()
+        }
         if (allApps.isNotEmpty()) {
             val refreshed = allApps.map { it.copy(isWatched = AppPreferences.isWatched(it.packageName)) }
             allApps = sorted(refreshed)
             applySearch(binding.etSearch.text?.toString() ?: "")
         }
+    }
+
+    override fun onPause() {
+        super.onPause()
+        stopCountdownTimer()
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -123,31 +153,39 @@ class MainActivity : AppCompatActivity() {
         val scheduledButInactive =
             AppPreferences.isScheduleEnabled && !AppPreferences.shouldBlock() && !isPaused
 
-        val (titleRes, descRes, colorRes) = when {
-            isPaused -> Triple(
-                R.string.status_title_paused,
-                R.string.status_desc_paused,
-                R.color.status_red
-            )
+        val (title, desc, colorRes) = when {
+            isPaused -> {
+                val remaining = AppPreferences.getPauseRemainingMs()
+                val description = if (remaining != Long.MAX_VALUE && remaining > 0) {
+                    getString(R.string.status_desc_paused_timed, formatCountdown(remaining))
+                } else {
+                    getString(R.string.status_desc_paused)
+                }
+                Triple(
+                    getString(R.string.status_title_paused),
+                    description,
+                    R.color.status_red
+                )
+            }
             scheduledButInactive -> Triple(
-                R.string.status_title_scheduled_inactive,
-                R.string.status_desc_scheduled_inactive,
+                getString(R.string.status_title_scheduled_inactive),
+                getString(R.string.status_desc_scheduled_inactive),
                 R.color.status_yellow
             )
             accessibilityOn -> Triple(
-                R.string.status_title_active,
-                R.string.status_desc_active,
+                getString(R.string.status_title_active),
+                getString(R.string.status_desc_active),
                 R.color.status_green
             )
             else -> Triple(
-                R.string.status_title_fallback,
-                R.string.status_desc_fallback,
+                getString(R.string.status_title_fallback),
+                getString(R.string.status_desc_fallback),
                 R.color.status_yellow
             )
         }
 
-        binding.tvStatusTitle.text = getString(titleRes)
-        binding.tvStatusDesc.text = getString(descRes)
+        binding.tvStatusTitle.text = title
+        binding.tvStatusDesc.text = desc
         binding.viewStatusDot.background.mutate()
             .setTint(ContextCompat.getColor(this, colorRes))
     }
@@ -155,8 +193,72 @@ class MainActivity : AppCompatActivity() {
     private fun setupPauseSwitch() {
         binding.switchPause.isChecked = !AppPreferences.isPaused
         binding.switchPause.setOnCheckedChangeListener { _, isChecked ->
-            AppPreferences.isPaused = !isChecked
-            refreshStatusCard()
+            if (!isChecked) {
+                showPauseDurationDialog()
+            } else {
+                AppPreferences.clearPause()
+                refreshStatusCard()
+                stopCountdownTimer()
+            }
+        }
+    }
+
+    private fun showPauseDurationDialog() {
+        val durations = listOf(
+            getString(R.string.pause_duration_5min) to 5L * 60 * 1000,
+            getString(R.string.pause_duration_15min) to 15L * 60 * 1000,
+            getString(R.string.pause_duration_30min) to 30L * 60 * 1000,
+            getString(R.string.pause_duration_1hour) to 60L * 60 * 1000,
+            getString(R.string.pause_duration_2hours) to 2L * 60 * 60 * 1000,
+            getString(R.string.pause_duration_indefinite) to -1L
+        )
+        val labels = durations.map { it.first }.toTypedArray()
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.pause_dialog_title)
+            .setItems(labels) { _, which ->
+                val durationMs = durations[which].second
+                if (durationMs < 0) {
+                    AppPreferences.startIndefinitePause()
+                    stopCountdownTimer()
+                } else {
+                    AppPreferences.startTimedPause(durationMs)
+                    startCountdownTimer()
+                }
+                binding.switchPause.isChecked = false
+                refreshStatusCard()
+            }
+            .setNegativeButton(R.string.pause_dialog_cancel) { _, _ ->
+                binding.switchPause.setOnCheckedChangeListener(null)
+                binding.switchPause.isChecked = true
+                setupPauseSwitch()
+            }
+            .setOnCancelListener {
+                binding.switchPause.setOnCheckedChangeListener(null)
+                binding.switchPause.isChecked = true
+                setupPauseSwitch()
+            }
+            .show()
+    }
+
+    private fun startCountdownTimer() {
+        countdownHandler.removeCallbacks(countdownRunnable)
+        countdownHandler.postDelayed(countdownRunnable, 1_000L)
+    }
+
+    private fun stopCountdownTimer() {
+        countdownHandler.removeCallbacks(countdownRunnable)
+    }
+
+    private fun formatCountdown(remainingMs: Long): String {
+        val totalSeconds = (remainingMs / 1000).toInt()
+        val hours = totalSeconds / 3600
+        val minutes = (totalSeconds % 3600) / 60
+        val seconds = totalSeconds % 60
+        return if (hours > 0) {
+            String.format("%d:%02d:%02d", hours, minutes, seconds)
+        } else {
+            String.format("%d:%02d", minutes, seconds)
         }
     }
 
